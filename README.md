@@ -1,3 +1,6 @@
+This is a fork and not the original!
+
+
 [![Gluon](.github/assets/gluon_logo.svg)](https://gluonhq.com)
 
 [![Build](https://github.com/gluonhq/rich-text-area/actions/workflows/build.yml/badge.svg)](https://github.com/gluonhq/rich-text-area/actions/workflows/build.yml)
