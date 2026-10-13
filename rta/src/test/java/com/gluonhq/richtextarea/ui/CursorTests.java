@@ -81,7 +81,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * - Emoji surrogate pairs stored as 2 internal units (high+low surrogates)
  * - In read-only mode, caret stays at -1
  * - After undo, caret goes to end of restored text
- * - END on a line goes to position before \n (e.g. "Hello\n" -> END = 4)
+ * - END on a line goes to position before \n (e.g. "Hello\n" -> END = 5)
  */
 @ExtendWith(ApplicationExtension.class)
 public class CursorTests {
@@ -325,9 +325,9 @@ public class CursorTests {
         robot.push(HOME);
         assertEquals(6, rta.getCaretPosition());
 
-        // END should go to end of "World" (before \n) = 10
+        // END should go to end of "World", right before \n at index 11 = 11
         robot.push(END);
-        assertEquals(10, rta.getCaretPosition());
+        assertEquals(11, rta.getCaretPosition());
 
         // Navigate up to "Hello" line then HOME/END
         robot.push(UP);
@@ -337,9 +337,9 @@ public class CursorTests {
         robot.push(HOME);
         assertEquals(0, rta.getCaretPosition());
 
-        // END should go to end of "Hello" (before \n) = 4
+        // END should go to end of "Hello", right before \n at index 5 = 5
         robot.push(END);
-        assertEquals(4, rta.getCaretPosition());
+        assertEquals(5, rta.getCaretPosition());
     }
 
     @Test
@@ -428,9 +428,9 @@ public class CursorTests {
         robot.push(UP);
         assertEquals(0, rta.getCaretPosition());
 
-        // Navigate to last line: END on first line (before \n) = 4, then DOWN
+        // Navigate to last line: END on first line (right before \n at 5) = 5, then DOWN
         robot.push(END);
-        assertEquals(4, rta.getCaretPosition());
+        assertEquals(5, rta.getCaretPosition());
         robot.push(DOWN);
         assertTrue(rta.getCaretPosition() >= 6 && rta.getCaretPosition() <= len);
         robot.push(END);
@@ -614,12 +614,12 @@ public class CursorTests {
         robot.push(HOME);
         assertEquals(0, rta.getCaretPosition());
 
-        // SHIFT+END selects from 0 to end of "Hello" (before \n) = 4
+        // SHIFT+END selects from 0 to end of "Hello", right before \n at 5 = 5
         robot.push(new KeyCodeCombination(END, SHIFT_DOWN));
         Selection selection = rta.getSelection();
         assertTrue(selection.isDefined());
         assertEquals(0, selection.getStart());
-        assertEquals(4, selection.getEnd());
+        assertEquals(5, selection.getEnd());
     }
 
     @Test
@@ -1325,9 +1325,9 @@ public class CursorTests {
         robot.push(HOME);
         assertEquals(0, rta.getCaretPosition());
 
-        // END on first line (before \n) = 11
+        // END on first line, right before \n at index 12 = 12
         robot.push(END);
-        assertEquals(11, rta.getCaretPosition());
+        assertEquals(12, rta.getCaretPosition());
 
         // DOWN to second line
         robot.push(DOWN);
