@@ -297,9 +297,12 @@ class ParagraphTile extends HBox {
                 handled[0] = true;
             }
         });
-        if (!handled[0] && paragraph != null && paragraph.getDecoration().hasTableDecoration()) {
+        if (!handled[0] && paragraph != null && (paragraph.getDecoration().hasTableDecoration()
+                || viewModel.isEmptyParagraph(paragraph))) {
             // If no layer was hit (e.g. layers are empty because VirtualFlow hasn't loaded
-            // the graphic yet), but the paragraph has a table, set caret to the first cell
+            // the graphic yet), but the paragraph has a table, set caret to the first cell.
+            // A click on an empty line that missed its layer also places the caret on the
+            // first position of that line, like in Word/LibreOffice.
             viewModel.setCaretPosition(paragraph.getStart());
             control.requestFocus();
             e.consume();
@@ -495,18 +498,28 @@ class ParagraphTile extends HBox {
                     // get global insertion point, preventing insertionIndex after linefeed
                     int globalInsertionIndex = Math.min(start + insertionIndex, getParagraphLimit() - 1);
                     if (!(e.isControlDown() || e.isAltDown() || e.isShiftDown() || e.isMetaDown() || e.isShortcutDown())) {
-                        viewModel.setCaretPosition(globalInsertionIndex);
-                        if (e.getClickCount() == 2) {
-                            viewModel.selectCurrentWord();
-                        } else if (e.getClickCount() == 3) {
-                            if (isTableCell) {
-                                viewModel.setSelection(new Selection(start, end));
-                            } else {
-                                viewModel.selectCurrentParagraph();
-                            }
-                        } else {
-                            richTextAreaSkin.mouseDragStart = globalInsertionIndex;
+                        if (e.getClickCount() != 3 && viewModel.isEmptyParagraph(paragraph)) {
+                            // Word/LibreOffice: a click on an empty line always places the
+                            // caret on the first position of that line. A double click
+                            // behaves like a plain click, as selectCurrentWord() would
+                            // otherwise move the caret to a neighbouring line's word.
+                            viewModel.setCaretPosition(start);
+                            richTextAreaSkin.mouseDragStart = start;
                             viewModel.clearSelection();
+                        } else {
+                            viewModel.setCaretPosition(globalInsertionIndex);
+                            if (e.getClickCount() == 2) {
+                                viewModel.selectCurrentWord();
+                            } else if (e.getClickCount() == 3) {
+                                if (isTableCell) {
+                                    viewModel.setSelection(new Selection(start, end));
+                                } else {
+                                    viewModel.selectCurrentParagraph();
+                                }
+                            } else {
+                                richTextAreaSkin.mouseDragStart = globalInsertionIndex;
+                                viewModel.clearSelection();
+                            }
                         }
                     } else if (e.isShiftDown() && e.getClickCount() == 1 && !(e.isControlDown() || e.isAltDown() || e.isMetaDown() || e.isShortcutDown())) {
                         int pos = prevSelection.isDefined() ?
@@ -578,7 +591,17 @@ class ParagraphTile extends HBox {
                     caretBounds.getCenterY();
             double xPos = x < 0d ? caretBounds.getMaxX() : x;
             HitInfo hitInfo = textFlow.hitTest(new Point2D(xPos, nextRowPos));
-            return start + hitInfo.getInsertionIndex();
+            int insertionIndex = hitInfo.getInsertionIndex();
+            // The caret glyph is a few pixels taller than the text flow. When moving
+            // down from the last visual row of a paragraph, the projected hit point
+            // lands just below the flow and hitTest can report an index one position
+            // past the paragraph's own text (e.g. past the trailing zero-width
+            // linefeed of an empty line). Clamp that overshoot to the paragraph end
+            // so the caret stays on the intended line instead of skipping ahead.
+            if (down && insertionIndex > getParagraphLimit() - start) {
+                insertionIndex = getParagraphLimit() - start;
+            }
+            return start + insertionIndex;
         }
 
         void updatePrefWidth(double prefWidth) {

@@ -255,9 +255,22 @@ class RichListCell extends ListCell<Paragraph> {
         }
     }
 
+    /**
+     * Zero-width placeholder for the linefeed of an empty paragraph.
+     * It must be a fresh node per paragraph: as the shared singleton returned by
+     * {@link Tools#noWidthText()} it can only be child of one TextFlow, so with
+     * adjacent empty lines one line's flow collapses to zero height, which breaks
+     * the click hit-testing, the caret placement and the navigation on that line.
+     */
+    private Text zeroWidthLinefeed() {
+        Text text = new Text(TextBuffer.ZERO_WIDTH_TEXT);
+        text.setFont(Font.font(DEFAULT_FONT_SIZE));
+        return text;
+    }
+
     private Text buildText(String content, TextDecoration decoration) {
         if ("\n".equals(content)) {
-            return Tools.noWidthText();
+            return zeroWidthLinefeed();
         }
         Objects.requireNonNull(decoration);
         Text text = new Text(Objects.requireNonNull(content).replace("\n", ""));
