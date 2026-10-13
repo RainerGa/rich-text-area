@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.gluonhq</groupId>
     <artifactId>rich-text-area</artifactId>
-    <version>1.2.6</version>
+    <version>1.2.6-patched</version>
     <packaging>jar</packaging>
 
     <name>Rich Text Area</name>
@@ -15,11 +15,18 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>21</maven.compiler.release>
-        <javafx.version>23.0.1</javafx.version>
+        <!-- Angeglichen an das RichMarkDownEditor-Projekt (JavaFX 25.0.4) -->
+        <javafx.version>25.0.4</javafx.version>
         <gpg.plugin.version>3.2.7</gpg.plugin.version>
         <emoji.version>1.1.0</emoji.version>
         <test.headless/>
         <test.javafx.version>26-ea+18</test.javafx.version>
+        <!-- Die Testsuite der Bibliothek (TestFX/Monocle) ist nicht Teil des
+             Projekt-Builds; das Projekt bringt eigene UI-Tests mit. -->
+        <skipTests>true</skipTests>
+        <!-- Quell-/Javadoc-Jars nur beim Deployment erzeugen -->
+        <maven.source.skip>true</maven.source.skip>
+        <maven.javadoc.skip>true</maven.javadoc.skip>
     </properties>
 
     <dependencies>

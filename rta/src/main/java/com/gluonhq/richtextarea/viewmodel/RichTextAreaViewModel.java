@@ -776,7 +776,19 @@ public class RichTextAreaViewModel {
 
     private void lineEnd() {
         int pos = getNextRowPosition.apply(Double.MAX_VALUE, null);
-        setCaretPosition(Math.max(pos == getTextLength() ? pos : pos - 1, 0));
+        int textLength = getTextLength();
+        // getNextRowPosition returns the position after the line's newline when the
+        // newline is a separate zero-width fragment of the text flow, and the
+        // position of the newline itself when it is part of the line's text.
+        // Skip the newline only in the former case, so the caret ends up right
+        // before it instead of one character too far to the left.
+        // The paragraph start guards empty lines, whose zero-width fragment may be
+        // missing, and the text length guards the last line, which has no newline.
+        int paragraphStart = getParagraphWithCaret().map(Paragraph::getStart).orElse(0);
+        if (pos > paragraphStart && pos < textLength && getTextBuffer().charAt(pos - 1) == 0x0a) {
+            pos = pos - 1;
+        }
+        setCaretPosition(Math.max(pos, 0));
     }
 
     private void paragraphStart() {
