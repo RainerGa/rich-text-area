@@ -27,6 +27,7 @@
  */
 package com.gluonhq.richtextarea.viewmodel;
 
+import com.gluonhq.richtextarea.Direction;
 import com.gluonhq.richtextarea.Selection;
 import com.gluonhq.richtextarea.Tools;
 import com.gluonhq.richtextarea.model.Decoration;
@@ -57,11 +58,9 @@ import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 
 import java.text.BreakIterator;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -77,7 +76,6 @@ public class RichTextAreaViewModel {
 
     public static final Logger LOGGER = Logger.getLogger(RichTextAreaViewModel.class.getName());
 
-    public enum Direction { FORWARD, BACK, UP, DOWN }
     public enum Remove { LETTER, WORD, LINE }
 
     private final CommandManager<RichTextAreaViewModel> commandManager = new CommandManager<>(this, this::updateProperties);

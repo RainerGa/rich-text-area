@@ -30,17 +30,12 @@ package com.gluonhq.richtextarea.ui;
 import com.gluonhq.richtextarea.RichTextArea;
 import com.gluonhq.richtextarea.RichTextAreaSkin;
 import com.gluonhq.richtextarea.model.Decoration;
-import com.gluonhq.richtextarea.model.Document;
 import com.gluonhq.richtextarea.model.Paragraph;
 import com.gluonhq.richtextarea.model.ParagraphDecoration;
 import com.gluonhq.richtextarea.model.TableDecoration;
-import com.gluonhq.richtextarea.model.TextDecoration;
-import com.gluonhq.richtextarea.action.Action;
-import com.gluonhq.richtextarea.viewmodel.ActionCmd;
-import com.gluonhq.richtextarea.viewmodel.ActionCmdFactory;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
-import javafx.geometry.Bounds;
+
 import javafx.geometry.Point2D;
 import javafx.scene.Node;
 import javafx.scene.Parent;
@@ -61,7 +56,7 @@ import org.testfx.api.FxRobot;
 import org.testfx.framework.junit5.ApplicationExtension;
 import org.testfx.framework.junit5.Init;
 import org.testfx.framework.junit5.Start;
-import org.testfx.util.WaitForAsyncUtils;
+
 
 import java.io.File;
 import java.io.IOException;
@@ -327,7 +322,6 @@ public class TableCaretDebugTest {
         
         if (para != null && para.getDecoration().hasTableDecoration()) {
             TableDecoration td = para.getDecoration().getTableDecoration();
-            int rows = td.getRows();
             int cols = td.getColumns();
             
             // Find the actual paragraph with table

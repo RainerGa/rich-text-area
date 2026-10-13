@@ -29,8 +29,6 @@ package com.gluonhq.richtextarea.viewmodel;
 
 import com.gluonhq.richtextarea.Selection;
 import com.gluonhq.richtextarea.model.Decoration;
-import com.gluonhq.richtextarea.model.ParagraphDecoration;
-import com.gluonhq.richtextarea.model.TextDecoration;
 import javafx.beans.binding.BooleanBinding;
 
 import java.util.List;

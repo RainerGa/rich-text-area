@@ -65,7 +65,6 @@ import org.testfx.framework.junit5.Init;
 import org.testfx.framework.junit5.Start;
 import org.testfx.matcher.base.NodeMatchers;
 
-import java.nio.CharBuffer;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -421,9 +420,6 @@ public class RTATest {
         assertEquals(267, rta.getCaretPosition());
         assertEquals(267, rta.getDocument().getCaretPosition());
 
-        String serialText = CharBuffer.wrap(rta.getDocument().getText().toCharArray()).chars()
-                .mapToObj(i -> i > 255 ? String.format("\\u%x", i) : String.valueOf((char) i))
-                .collect(Collectors.joining());
         String text = "Document with emojis \ud83d\ude03!\n" +
                 "\ud83d\udc4b\ud83c\udffc, this is some random text with some emojis like \ud83e\uddd1\ud83c\udffc\u200d\ud83e\udd1d\u200d\ud83e\uddd1\ud83c\udffd or \ud83c\udff4\udb40\udc67\udb40\udc62\udb40\udc73\udb40\udc63\udb40\udc74\udb40\udc7f.\n" +
                 "These are emojis with skin tone or hair style, like:\n" +
@@ -803,8 +799,6 @@ public class RTATest {
         assertEquals(35, rta.getCaretPosition());
         assertEquals(35, rta.getDocument().getCaretPosition());
         assertEquals(4, rta.getDocument().getDecorations().size());
-
-        Document document = rta.getDocument();
 
         robot.push(new KeyCodeCombination(HOME)).push(new KeyCodeCombination(RIGHT)).push(new KeyCodeCombination(RIGHT));
         assertEquals(2, rta.getCaretPosition());

@@ -2,12 +2,7 @@ package com.gluonhq.richtextarea.ui;
 
 import com.gluonhq.richtextarea.RichTextArea;
 import com.gluonhq.richtextarea.RichTextAreaSkin;
-import com.gluonhq.richtextarea.Selection;
-import com.gluonhq.richtextarea.Tools;
-import com.gluonhq.richtextarea.action.ActionFactory;
 import com.gluonhq.richtextarea.model.Document;
-import com.gluonhq.richtextarea.model.Paragraph;
-import com.gluonhq.richtextarea.model.TableDecoration;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
@@ -18,16 +13,11 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.input.KeyCode;
-import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
-import javafx.scene.shape.Rectangle;
-import javafx.scene.shape.StrokeType;
-import javafx.scene.text.Text;
 import javafx.stage.Stage;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Systematic hypothesis testing for cursor rendering error.

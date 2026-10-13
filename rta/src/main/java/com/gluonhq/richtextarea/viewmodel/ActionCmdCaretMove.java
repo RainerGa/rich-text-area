@@ -27,25 +27,26 @@
  */
 package com.gluonhq.richtextarea.viewmodel;
 
+import com.gluonhq.richtextarea.Direction;
 import com.gluonhq.richtextarea.Tools;
 import javafx.scene.input.KeyEvent;
 
 public class ActionCmdCaretMove implements ActionCmd {
 
-    //TODO move direction into  this action?
-    RichTextAreaViewModel.Direction direction;
+    // TODO: move direction into this action?
+    Direction direction;
     boolean changeSelection;
     boolean wordSelection;
     boolean lineSelection;
 
-    public ActionCmdCaretMove(RichTextAreaViewModel.Direction direction, boolean changeSelection, boolean wordSelection, boolean lineSelection) {
+    public ActionCmdCaretMove(Direction direction, boolean changeSelection, boolean wordSelection, boolean lineSelection) {
         this.direction = direction;
         this.changeSelection = changeSelection;
         this.wordSelection = wordSelection;
         this.lineSelection = lineSelection;
     }
 
-    public ActionCmdCaretMove(RichTextAreaViewModel.Direction direction, KeyEvent event) {
+    public ActionCmdCaretMove(Direction direction, KeyEvent event) {
         this(direction,
               event.isShiftDown(),
               Tools.MAC ? event.isAltDown() : event.isControlDown(),

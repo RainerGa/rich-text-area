@@ -27,8 +27,8 @@
  */
 package com.gluonhq.richtextarea.model;
 
+import com.gluonhq.richtextarea.Direction;
 import com.gluonhq.richtextarea.Selection;
-import com.gluonhq.richtextarea.Tools;
 
 import java.util.List;
 import java.util.logging.Level;
@@ -36,8 +36,6 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
-
-import static com.gluonhq.richtextarea.viewmodel.RichTextAreaViewModel.Direction;
 
 /**
  * Table is a {@link Paragraph} with a single text string that contains

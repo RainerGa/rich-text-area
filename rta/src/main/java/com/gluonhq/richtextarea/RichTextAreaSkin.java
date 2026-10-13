@@ -72,7 +72,6 @@ import javafx.geometry.Point2D;
 import javafx.scene.Cursor;
 import javafx.scene.Group;
 import javafx.scene.Node;
-import javafx.scene.Scene;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
@@ -117,7 +116,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-import static com.gluonhq.richtextarea.viewmodel.RichTextAreaViewModel.Direction;
 import static java.util.Map.entry;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -663,8 +661,8 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
     protected final Paint getPromptTextFill() {
         return promptTextFill.getValue();
     }
-    protected final ObjectProperty<Paint> promptTextFillProperty() {
-        return (ObjectProperty<Paint>) promptTextFill;
+    protected final StyleableProperty<Paint> promptTextFillProperty() {
+        return promptTextFill;
     }
 
     private final DoubleProperty fullHeightProperty = new SimpleDoubleProperty(this, "fullHeight") {
@@ -773,7 +771,7 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
         viewModel.documentProperty().addListener(documentChangeListener);
         viewModel.autoSaveProperty().bind(getSkinnable().autoSaveProperty());
         promptNode.textProperty().bind(getSkinnable().promptTextProperty());
-        promptNode.fillProperty().bind(promptTextFillProperty());
+        promptNode.fillProperty().bind(Bindings.createObjectBinding(() -> getPromptTextFill(), (Observable) promptTextFill));
         getSkinnable().setOnContextMenuRequested(contextMenuEventEventHandler);
         getSkinnable().editableProperty().addListener(this::editableChangeListener);
         getSkinnable().tableAllowedProperty().addListener(tableAllowedListener);

@@ -376,7 +376,7 @@ public class ManualVsAutomatedComparisonTest {
         for (Node caret : carets) {
             if (caret instanceof Path path && !path.getElements().isEmpty()) {
                 PathElement first = path.getElements().get(0);
-                if (first instanceof MoveTo moveTo) {
+                if (first instanceof MoveTo) {
                     Point2D scenePos = path.localToScene(path.getLayoutBounds().getMinX(), path.getLayoutBounds().getMinY());
                     System.out.println("  Caret at scene: ("
                         + String.format("%.1f, %.1f", scenePos.getX(), scenePos.getY()) + ")");

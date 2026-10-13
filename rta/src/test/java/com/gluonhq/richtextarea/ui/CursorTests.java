@@ -37,15 +37,10 @@ import com.gluonhq.richtextarea.model.TableDecoration;
 import com.gluonhq.richtextarea.model.TextDecoration;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
-import javafx.geometry.Bounds;
 import javafx.geometry.Point2D;
-import javafx.scene.Node;
 import javafx.scene.Scene;
-import javafx.scene.text.TextFlow;
-import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.GridPane;
 import javafx.scene.shape.Path;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Assertions;
@@ -59,10 +54,8 @@ import org.testfx.framework.junit5.Init;
 import org.testfx.framework.junit5.Start;
 
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 import static javafx.scene.input.KeyCode.*;
 import static javafx.scene.input.KeyCombination.*;
@@ -1374,7 +1367,6 @@ public class CursorTests {
         });
         waitForFxEvents();
         RichTextArea rta = robot.lookup(".rich-text-area").query();
-        int len = rta.getTextLength();
 
         // In read-only mode, caret stays at -1
         // Navigation should still work via key events
@@ -1627,7 +1619,6 @@ public class CursorTests {
         });
         waitForFxEvents();
         RichTextArea rta = robot.lookup(".rich-text-area").query();
-        int originalLen = rta.getTextLength();
 
         robot.write(" World");
         int extendedLen = rta.getTextLength();
@@ -2031,7 +2022,6 @@ public class CursorTests {
         });
         waitForFxEvents();
         RichTextArea rta = robot.lookup(".rich-text-area").query();
-        int len = rta.getTextLength();
 
         run(() -> richTextArea.getActionFactory().selectAll().execute(new ActionEvent()));
         waitForFxEvents();

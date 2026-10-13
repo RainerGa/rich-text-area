@@ -28,6 +28,7 @@
 package com.gluonhq.richtextarea.viewmodel;
 
 import com.gluonhq.emoji.Emoji;
+import com.gluonhq.richtextarea.Direction;
 import com.gluonhq.richtextarea.Selection;
 import com.gluonhq.richtextarea.model.Block;
 import com.gluonhq.richtextarea.model.Decoration;
@@ -182,11 +183,11 @@ public final class ActionCmdFactory {
         return new ActionCmdDecorate(decorations);
     }
 
-    public ActionCmd caretMove(RichTextAreaViewModel.Direction direction, KeyEvent event) {
+    public ActionCmd caretMove(Direction direction, KeyEvent event) {
         return new ActionCmdCaretMove(direction, event);
     }
 
-    public ActionCmd caretMove(RichTextAreaViewModel.Direction direction, boolean changeSelection, boolean wordSelection, boolean lineSelection) {
+    public ActionCmd caretMove(Direction direction, boolean changeSelection, boolean wordSelection, boolean lineSelection) {
         return new ActionCmdCaretMove(direction, changeSelection, wordSelection, lineSelection);
     }
 

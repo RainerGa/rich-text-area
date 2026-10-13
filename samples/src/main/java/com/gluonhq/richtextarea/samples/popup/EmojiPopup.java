@@ -67,7 +67,6 @@ import javafx.util.Duration;
 
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
 import java.util.ResourceBundle;
 import java.util.stream.Stream;
@@ -259,7 +258,6 @@ public class EmojiPopup extends PopupControl {
 
         private final ObjectProperty<Emoji> focusedEmoji;
         private final GridPane content;
-        private final ToggleGroup skinToneToogleGroup = new ToggleGroup();
 
         // category
         private final ObjectProperty<EmojiCategory> category = new SimpleObjectProperty<>(this, "category");
