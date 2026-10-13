@@ -27,7 +27,6 @@
  */
 package com.gluonhq.richtextarea.model;
 
-import javafx.scene.paint.Color;
 import javafx.scene.text.FontPosture;
 import javafx.scene.text.FontWeight;
 import org.junit.jupiter.api.Assertions;

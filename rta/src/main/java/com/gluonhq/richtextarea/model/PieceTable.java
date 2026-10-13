@@ -447,7 +447,12 @@ public final class PieceTable extends AbstractTextBuffer {
 
     }
 
-    // TODO is there standard APIs?
+    /**
+     * Checks whether the half-open range {@code [start, start + length)} contains
+     * the given index. There is no standard API for this: the JDK only offers
+     * throwing variants ({@link java.util.Objects#checkFromIndexRange(int, int, int)}),
+     * so this small helper is kept instead of wrapping them in a try/catch.
+     */
     static boolean inRange( int index, int start, int length ) {
         return index >= start && index < start+length;
     }
@@ -1118,11 +1123,6 @@ class ParagraphDecorateCmd extends AbstractCommand<PieceTable> {
             pt.fire(new TextBuffer.DecorateEvent(start, end, paragraphDecoration));
             execSuccess = true;
         }
-    }
-
-    private boolean isPieceInSelection(Piece piece, int textPosition) {
-        int pieceEndPosition = textPosition + piece.length - 1;
-        return start <= pieceEndPosition && (end >= pieceEndPosition || end >= textPosition);
     }
 
     @Override

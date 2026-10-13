@@ -26,11 +26,18 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 module com.gluonhq.richtextarea {
-    requires javafx.controls;
-    requires com.gluonhq.emoji;
-    requires java.logging;
+    // requires javafx.controls;
+    // Die öffentliche API der exportierten Pakete verwendet Typen dieser Module
+    // (Node, TextAlignment, Insets, Logger, DataFormat, Point2D, IndexRange, Font, Text, Styleable, etc.)
+    // Ohne 'requires transitive' können Clients die Signaturen nicht auflösen.
+    requires transitive javafx.base;
+    requires transitive javafx.controls;
+    requires transitive javafx.graphics;
+    requires transitive com.gluonhq.emoji;
+    requires transitive java.logging;
 
     exports com.gluonhq.richtextarea;
     exports com.gluonhq.richtextarea.action;
     exports com.gluonhq.richtextarea.model;
+    exports com.gluonhq.richtextarea.viewmodel;
 }

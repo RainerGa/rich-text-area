@@ -27,6 +27,7 @@
  */
 package com.gluonhq.richtextarea.viewmodel;
 
+import com.gluonhq.richtextarea.Direction;
 import com.gluonhq.richtextarea.Selection;
 import com.gluonhq.richtextarea.model.Paragraph;
 import com.gluonhq.richtextarea.model.ParagraphDecoration;
@@ -39,8 +40,6 @@ import com.gluonhq.richtextarea.undo.CommandManager;
 import javafx.beans.binding.Bindings;
 import javafx.beans.binding.BooleanBinding;
 import javafx.scene.text.TextAlignment;
-
-import static com.gluonhq.richtextarea.viewmodel.RichTextAreaViewModel.Direction;
 
 class ActionCmdTable implements ActionCmd {
 

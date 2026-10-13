@@ -68,8 +68,6 @@ import javafx.scene.text.TextAlignment;
 import javafx.scene.text.TextFlow;
 import javafx.util.Duration;
 
-import static javafx.scene.layout.Region.USE_COMPUTED_SIZE;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -402,8 +400,6 @@ class ParagraphTile extends HBox {
                 new KeyFrame(Duration.seconds(1.0))
         );
 
-        private boolean hasValidCaret;
-
         private final ObservableSet<Path> textBackgroundColorPaths = FXCollections.observableSet();
         private final Path caretShape = new Path();
         private final Path selectionShape = new Path();
@@ -468,6 +464,7 @@ class ParagraphTile extends HBox {
             caretTimeline.stop();
         }
 
+        @SuppressWarnings("deprecation")
         private void addBackgroundPathsToLayers(List<IndexRangeColor> backgroundIndexRanges) {
             Map<Paint, Path> fillPathMap = backgroundIndexRanges.stream()
                     .map(indexRangeBackground -> {
@@ -487,6 +484,7 @@ class ParagraphTile extends HBox {
             textBackgroundColorPaths.addAll(fillPathMap.values());
         }
 
+        @SuppressWarnings("deprecation")
         void mousePressedListener(MouseEvent e) {
             Point2D localEvent = screenToLocal(e.getScreenX(), e.getScreenY());
             if (e.getButton() == MouseButton.PRIMARY && !(e.isMiddleButtonDown() || e.isSecondaryButtonDown())) {
@@ -537,6 +535,7 @@ class ParagraphTile extends HBox {
             }
         }
 
+        @SuppressWarnings("deprecation")
         void mouseDraggedListener(MouseEvent e) {
             Point2D localEvent = screenToLocal(e.getScreenX(), e.getScreenY());
             HitInfo hitInfo = textFlow.hitTest(new Point2D(localEvent.getX() - textFlowLayoutX, localEvent.getY() - textFlowLayoutY));
@@ -564,6 +563,7 @@ class ParagraphTile extends HBox {
                     .collect(Collectors.toSet()));
         }
 
+        @SuppressWarnings("deprecation")
         double getCaretY() {
             var pathElements = textFlow.caretShape(0, false);
             return Stream.of(pathElements)
@@ -590,6 +590,7 @@ class ParagraphTile extends HBox {
                             caretBounds.getMinY() - textFlow.getLineSpacing() :
                     caretBounds.getCenterY();
             double xPos = x < 0d ? caretBounds.getMaxX() : x;
+            @SuppressWarnings("deprecation")
             HitInfo hitInfo = textFlow.hitTest(new Point2D(xPos, nextRowPos));
             int insertionIndex = hitInfo.getInsertionIndex();
             // The caret glyph is a few pixels taller than the text flow. When moving
@@ -626,6 +627,7 @@ class ParagraphTile extends HBox {
                 // textFlow.caretShape() calculates positions based on current text content
                 textFlow.applyCss();
                 textFlow.layout();
+                @SuppressWarnings("deprecation")
                 var pathElements = textFlow.caretShape(caretPosition - start, true);
                 if (pathElements.length > 0) {
                     caretShape.getElements().addAll(pathElements);
@@ -675,6 +677,7 @@ class ParagraphTile extends HBox {
             }
         }
 
+        @SuppressWarnings("deprecation")
         private void updateSelection(Selection selection) {
             selectionShape.getElements().clear();
             if (selection != null && selection.isDefined() && !(start > selection.getEnd() || end <= selection.getStart())) {

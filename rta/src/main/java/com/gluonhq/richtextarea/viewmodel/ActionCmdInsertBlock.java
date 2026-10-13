@@ -29,7 +29,6 @@ package com.gluonhq.richtextarea.viewmodel;
 
 import com.gluonhq.richtextarea.Selection;
 import com.gluonhq.richtextarea.model.Block;
-import com.gluonhq.richtextarea.model.TextBuffer;
 import javafx.beans.binding.BooleanBinding;
 
 import java.util.Objects;

@@ -27,7 +27,7 @@
  */
 package com.gluonhq.richtextarea.model;
 
-import com.gluonhq.richtextarea.viewmodel.RichTextAreaViewModel;
+import com.gluonhq.richtextarea.Direction;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -145,11 +145,11 @@ public class TableTests {
         PieceTable pt = new PieceTable(FACE_MODEL);
         Assertions.assertEquals(FACE_MODEL.getText(), pt.getText());
         Table table = new Table(pt.originalText, 0, 2, 2);
-        UnitBuffer newBuffer = table.addColumnAndGetTableText(0, RichTextAreaViewModel.Direction.BACK);
+        UnitBuffer newBuffer = table.addColumnAndGetTableText(0, Direction.BACK);
         Assertions.assertEquals("\u200bOne\u200bText\u200b\u200bname!\u200bend", newBuffer.getText());
-        newBuffer = table.addColumnAndGetTableText(0, RichTextAreaViewModel.Direction.FORWARD);
+        newBuffer = table.addColumnAndGetTableText(0, Direction.FORWARD);
         Assertions.assertEquals("One\u200b\u200bText\u200bname!\u200b\u200bend", newBuffer.getText());
-        newBuffer = table.addColumnAndGetTableText(4, RichTextAreaViewModel.Direction.FORWARD);
+        newBuffer = table.addColumnAndGetTableText(4, Direction.FORWARD);
         Assertions.assertEquals("One\u200bText\u200b\u200bname!\u200bend\u200b", newBuffer.getText());
     }
 
@@ -159,11 +159,11 @@ public class TableTests {
         PieceTable pt = new PieceTable(FACE_MODEL_WITH_EMOJI);
         Assertions.assertEquals(FACE_MODEL_WITH_EMOJI.getText(), pt.getText());
         Table table = new Table(pt.originalText, 0, 2, 2);
-        UnitBuffer newBuffer = table.addColumnAndGetTableText(0, RichTextAreaViewModel.Direction.BACK);
+        UnitBuffer newBuffer = table.addColumnAndGetTableText(0, Direction.BACK);
         Assertions.assertEquals("\u200bOne \ud83d\ude00\u200bText\u200b\u200bname!\u200bend", newBuffer.getText());
-        newBuffer = table.addColumnAndGetTableText(0, RichTextAreaViewModel.Direction.FORWARD);
+        newBuffer = table.addColumnAndGetTableText(0, Direction.FORWARD);
         Assertions.assertEquals("One \ud83d\ude00\u200b\u200bText\u200bname!\u200b\u200bend", newBuffer.getText());
-        newBuffer = table.addColumnAndGetTableText(7, RichTextAreaViewModel.Direction.FORWARD);
+        newBuffer = table.addColumnAndGetTableText(7, Direction.FORWARD);
         Assertions.assertEquals("One \ud83d\ude00\u200bText\u200b\u200bname!\u200bend\u200b", newBuffer.getText());
     }
 
