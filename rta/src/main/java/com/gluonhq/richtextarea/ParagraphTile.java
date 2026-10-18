@@ -153,6 +153,9 @@ class ParagraphTile extends HBox {
             layer.setContent(fragments, background, decoration);
             layers.add(layer);
             contentPane.getChildren().add(layer);
+            // Update caret position after content is set, since the caretPositionListener
+            // may fire before the TextFlow has been laid out (e.g. after line wrap)
+            Platform.runLater(() -> updateCaretPosition(viewModel.getCaretPosition()));
             contentPane.setPrefWidth(layer.getPrefWidth());
             updateGraphicBox(layer, control.getParagraphGraphicFactory());
             graphicBox.setPadding(new Insets(decoration.getTopInset(), 2, decoration.getBottomInset(), 0));
@@ -631,6 +634,39 @@ class ParagraphTile extends HBox {
                 var pathElements = textFlow.caretShape(caretPosition - start, true);
                 if (pathElements.length > 0) {
                     caretShape.getElements().addAll(pathElements);
+                } else if (richTextAreaSkin.lastValidCaretPosition >= 0
+                        && richTextAreaSkin.lastValidCaretPosition != caretPosition
+                        && caretPosition >= start && caretPosition < getParagraphLimit()) {
+                    // Fallback: TextFlow konnte die Caret-Position nicht auflösen (z. B. nach Zeilenumbruch).
+                    // Wiederhole mit der zuletzt bekannten gültigen Position, damit der Cursor sichtbar bleibt.
+                    caretShape.getElements().clear();
+                    int fallbackPos = richTextAreaSkin.lastValidCaretPosition;
+                    var fallbackElements = textFlow.caretShape(fallbackPos - start, true);
+                    if (fallbackElements.length > 0) {
+                        caretShape.getElements().addAll(fallbackElements);
+                        if (caretShape.getLayoutBounds().getHeight() < 5) {
+                            double originX = caretShape.getElements().stream()
+                                    .filter(MoveTo.class::isInstance)
+                                    .map(MoveTo.class::cast)
+                                    .findFirst()
+                                    .map(MoveTo::getX)
+                                    .orElse(0d);
+                            double caretSize = DEFAULT_FONT_SIZE * 1.2;
+                            if (viewModel.getDecorationAtCaret() instanceof TextDecoration) {
+                                TextDecoration td = (TextDecoration) viewModel.getDecorationAtCaret();
+                                caretSize = td.getFontSize() * 1.2;
+                            }
+                            caretShape.getElements().add(new LineTo(originX, caretSize));
+                        }
+                        richTextAreaSkin.lastValidCaretPosition = caretPosition;
+                        if (getScene() != null) {
+                            caretTimeline.play();
+                        }
+                        caretShape.setLayoutX(textFlowLayoutX);
+                        caretShape.setLayoutY(textFlowLayoutY);
+                        updateCaretOrigin();
+                    }
+                }
                     // prevent tiny caret
                     if (caretShape.getLayoutBounds().getHeight() < 5) {
                         double originX = caretShape.getElements().stream()
@@ -655,7 +691,6 @@ class ParagraphTile extends HBox {
                     caretShape.setLayoutY(textFlowLayoutY);
                     // Only update caret origin for the layer that actually has the caret
                     updateCaretOrigin();
-                }
             }
         }
 

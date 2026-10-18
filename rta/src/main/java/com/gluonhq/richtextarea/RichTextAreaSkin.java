@@ -68,6 +68,7 @@ import javafx.css.StyleablePropertyFactory;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.geometry.Bounds;
+import javafx.geometry.Orientation;
 import javafx.geometry.Point2D;
 import javafx.scene.Cursor;
 import javafx.scene.Group;
@@ -78,6 +79,7 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.ScrollBar;
 import javafx.scene.control.Skin;
 import javafx.scene.control.SkinBase;
 import javafx.scene.control.skin.ListViewSkin;
@@ -630,22 +632,62 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
 
         void scrollIfNeeded() {
             final Bounds vfBounds = virtualFlow.localToScene(virtualFlow.getBoundsInLocal());
+            double viewportMinX = vfBounds.getMinX();
+            double viewportMaxX = vfBounds.getMaxX();
             double viewportMinY = vfBounds.getMinY();
             double viewportMaxY = vfBounds.getMaxY();
+
+            // Find horizontal scrollbar (may not exist if content fits)
+            final ScrollBar hbar = findHorizontalScrollBar();
+
             caret().ifPresentOrElse(caret -> {
                 final Bounds bounds = caret.localToScene(caret.getBoundsInLocal());
+                double minX = bounds.getMinX();
+                double maxX = bounds.getMaxX();
                 double minY = bounds.getMinY();
                 double maxY = bounds.getMaxY();
+
+                // Vertical scrolling (existing logic)
                 if (!(maxY <= viewportMaxY && minY >= viewportMinY)) {
                     // If caret is not fully visible, scroll line by line as needed
                     virtualFlow.scrollPixels(maxY > viewportMaxY ?
                             maxY - viewportMaxY + 1 : minY - viewportMinY - 1);
+                }
+
+                // Horizontal scrolling (new logic)
+                if (hbar != null && hbar.isVisible() && !(maxX <= viewportMaxX && minX >= viewportMinX)) {
+                    // Caret is horizontally outside viewport - scroll to make it visible
+                    double hValue = hbar.getValue();
+                    double hMin = hbar.getMin();
+                    double hMax = hbar.getMax();
+
+                    if (maxX > viewportMaxX) {
+                        // Caret is to the right of viewport - scroll right
+                        double overshoot = maxX - viewportMaxX;
+                        double newValue = Math.min(hMax, hValue + overshoot + 5); // +5 for padding
+                        hbar.setValue(newValue);
+                    } else if (minX < viewportMinX) {
+                        // Caret is to the left of viewport - scroll left
+                        double overshoot = viewportMinX - minX;
+                        double newValue = Math.max(hMin, hValue - overshoot - 5); // -5 for padding
+                        hbar.setValue(newValue);
+                    }
                 }
             }, () -> {
                 // In case no caret was found (paragraph is not in a listCell yet),
                 // scroll directly to the paragraph
                 viewModel.getParagraphWithCaret().ifPresent(this::scrollTo);
             });
+        }
+
+        private ScrollBar findHorizontalScrollBar() {
+            for (Node node : virtualFlow.lookupAll(".scroll-bar")) {
+                if (node instanceof ScrollBar bar
+                        && bar.getOrientation() == Orientation.HORIZONTAL) {
+                    return bar;
+                }
+            }
+            return null;
         }
     }
 
