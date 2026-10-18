@@ -672,7 +672,7 @@ public class RichTextAreaViewModel {
             return List.of();
         }
         return paragraphList.stream()
-                .filter(p -> !(p.getStart() > selection.getEnd() || p.getEnd() <= selection.getStart()))
+                .filter(p -> p.getStart() < selection.getEnd() && p.getEnd() > selection.getStart())
                 .collect(Collectors.toList());
     }
 

@@ -969,7 +969,9 @@ class TextDecorateCmd extends AbstractCommand<PieceTable> {
 
         pt.walkPieces((piece, pieceIndex, textPosition) -> {
             if (isPieceInSelection(piece, textPosition)) {
-                startPieceIndex[0] = pieceIndex;
+                if (removals.isEmpty()) {
+                    startPieceIndex[0] = pieceIndex;
+                }
                 if (textPosition <= start) {
                     int offset = start - textPosition;
                     int length;
@@ -1075,7 +1077,9 @@ class ParagraphDecorateCmd extends AbstractCommand<PieceTable> {
         pt.walkPieces((piece, pieceIndex, textPosition) -> {
             int pieceEndPosition = textPosition + piece.length + (start == pt.getTextLength() ? 0 : - 1);
             if (start <= pieceEndPosition && (end >= pieceEndPosition || end >= textPosition)) {
-                startPieceIndex[0] = pieceIndex;
+                if (removals.isEmpty()) {
+                    startPieceIndex[0] = pieceIndex;
+                }
                 if (start == pt.getTextLength()) {
                     int offset = start - textPosition;
                     if (offset > 0) {

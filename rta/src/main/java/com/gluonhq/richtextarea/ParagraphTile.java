@@ -54,6 +54,7 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.RowConstraints;
 import javafx.scene.paint.Paint;
 import javafx.scene.shape.LineTo;
@@ -158,7 +159,6 @@ class ParagraphTile extends HBox {
             Platform.runLater(() -> updateCaretPosition(viewModel.getCaretPosition()));
             contentPane.setPrefWidth(layer.getPrefWidth());
             updateGraphicBox(layer, control.getParagraphGraphicFactory());
-            graphicBox.setPadding(new Insets(decoration.getTopInset(), 2, decoration.getBottomInset(), 0));
             contentPane.requestLayout();
         }
     }
@@ -221,6 +221,9 @@ class ParagraphTile extends HBox {
         }
         double spanPrefWidth = Math.max((indentationLevel - (graphicNode == null ? 0 : 1)) * INDENT_PADDING, 0d);
 
+        double rightPadding = (graphicNode == null) ? 0d : 2d;
+        graphicBox.setPadding(new Insets(decoration.getTopInset(), rightPadding, decoration.getBottomInset(), 0));
+
         if (graphicNode == null) {
             graphicBox.setMinWidth(spanPrefWidth);
             graphicBox.setMaxWidth(spanPrefWidth);
@@ -237,8 +240,9 @@ class ParagraphTile extends HBox {
                 text = formatNumber(text, indentationLevel);
                 label.setText(text);
                 label.setFont(font);
-                double w = Tools.computeStringWidth(font, text);
-                nodePrefWidth = Math.max(w + 1, INDENT_PADDING);
+                label.setMinWidth(Region.USE_PREF_SIZE);
+                double labelWidth = Math.ceil(Math.max(Tools.computeStringWidth(font, text), label.prefWidth(-1)));
+                nodePrefWidth = Math.max(labelWidth + rightPadding + 2, INDENT_PADDING);
                 nodePrefHeight = Tools.computeStringHeight(font, text);
             }
         } else if (graphicNode instanceof Text textNode) {
@@ -248,11 +252,11 @@ class ParagraphTile extends HBox {
                 textNode.setText(text);
                 textNode.setFont(font);
                 double w = Tools.computeStringWidth(font, text);
-                nodePrefWidth = Math.max(w + 1, INDENT_PADDING);
+                nodePrefWidth = Math.max(w + rightPadding + 2, INDENT_PADDING);
                 nodePrefHeight = Tools.computeStringHeight(font, text);
             }
         } else {
-            nodePrefWidth = Math.max(graphicNode.prefWidth(-1), INDENT_PADDING);
+            nodePrefWidth = Math.max(graphicNode.prefWidth(-1) + rightPadding, INDENT_PADDING);
             nodePrefHeight = graphicNode.prefHeight(nodePrefWidth);
         }
 
@@ -267,20 +271,27 @@ class ParagraphTile extends HBox {
         if (text.contains("#")) {
             // numbered list
             AtomicInteger ordinal = new AtomicInteger();
+            AtomicInteger startNumber = new AtomicInteger(1);
             return viewModel.getParagraphList().stream()
                     .peek(p -> {
-                        if (p.getDecoration().getGraphicType() != ParagraphDecoration.GraphicType.NUMBERED_LIST ||
-                                p.getDecoration().getIndentationLevel() != indentationLevel) {
+                        ParagraphDecoration pd = p.getDecoration();
+                        if (pd.getGraphicType() != ParagraphDecoration.GraphicType.NUMBERED_LIST ||
+                                pd.getIndentationLevel() != indentationLevel) {
                             // restart ordinal if previous paragraph has different indentation,
                             // or if it is not a numbered list
                             ordinal.set(0);
+                            startNumber.set(1);
                         } else {
+                            if (ordinal.get() == 0 || pd.getStartNumber() != startNumber.get()) {
+                                startNumber.set(pd.getStartNumber());
+                                ordinal.set(0);
+                            }
                             ordinal.incrementAndGet();
                         }
                     })
                     .filter(p -> paragraph.equals(p))
                     .findFirst()
-                    .map(p -> text.replace("#", "" + ordinal.get()))
+                    .map(p -> text.replace("#", "" + (startNumber.get() + ordinal.get() - 1)))
                     .orElse(text);
         }
         return text;
@@ -582,7 +593,7 @@ class ParagraphTile extends HBox {
                     .map(Text.class::cast)
                     .findFirst()
                     .orElse(null);
-            return Font.font(textNode != null ? textNode.getFont().getSize() : DEFAULT_FONT_SIZE);
+            return textNode != null ? textNode.getFont() : Font.font(DEFAULT_FONT_SIZE);
         }
 
         int getNextRowPosition(double x, boolean down) {
