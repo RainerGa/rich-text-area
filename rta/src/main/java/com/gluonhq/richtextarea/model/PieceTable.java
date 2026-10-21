@@ -155,12 +155,13 @@ public final class PieceTable extends AbstractTextBuffer {
         StringBuilder sb = new StringBuilder();
         walkPieces((p, i, tp) -> {
             Unit unit = p.getUnit();
+            String text = exportableText(p, unit);
             int sbMin = sb.length();
-            int sbMax = sbMin + unit.getText().length();
+            int sbMax = sbMin + text.length();
             if (sbMin <= position && position <= sbMax) {
                 s0 = tp + p.length;
             }
-            sb.append(unit.getText());
+            sb.append(text);
             return (s0 > -1);
         });
         return s0;
@@ -191,22 +192,42 @@ public final class PieceTable extends AbstractTextBuffer {
         StringBuilder sb = new StringBuilder();
         walkPieces((p, i, tp) -> {
             Unit unit = p.getUnit();
+            String text = exportableText(p, unit);
             int sbMin = sb.length();
             int deltaMin = unit instanceof TextUnit ?
                     Math.max(0, start - sbMin) : 0;
-            int sbMax = Math.min(end, sbMin + unit.getText().length());
+            int sbMax = Math.min(end, sbMin + text.length());
             int deltaMax = unit instanceof TextUnit ?
-                    Math.max(0, (sbMin + unit.getText().length()) - end) : 0;
+                    Math.max(0, (sbMin + text.length()) - end) : 0;
             if (sbMin <= start && start <= sbMax) {
                 s0 = tp + deltaMin;
             }
             if (sbMin <= end && end <= sbMax) {
                 s1 = tp + p.length - deltaMax;
             }
-            sb.append(unit.getText());
+            sb.append(text);
             return (s0 > -1 && s1 > -1);
         });
         return new Selection(s0, s1);
+    }
+
+    /**
+     * The exportable text of a piece.
+     *
+     * <p>For a text unit the exportable text is the text that the piece covers, which can be
+     * less than the text of the unit, when the piece only spans a part of it. This happens
+     * whenever the text of a unit is edited, e.g. when a word in a table cell is replaced: the
+     * piece is then split into several pieces, and every piece covers only a part of the unit.
+     *
+     * <p>For all other units (emoji, image, block) the exportable text is the text of the unit
+     * itself, that can be longer than the internal text of the piece.
+     *
+     * @param piece the piece
+     * @param unit the unit of the piece
+     * @return the exportable text of the piece
+     */
+    private static String exportableText(Piece piece, Unit unit) {
+        return unit instanceof TextUnit ? piece.getInternalText() : unit.getText();
     }
 
     /**

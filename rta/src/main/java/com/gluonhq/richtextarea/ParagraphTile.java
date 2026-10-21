@@ -438,6 +438,14 @@ class ParagraphTile extends HBox {
             selectionShape.getStyleClass().setAll("selection");
             textBackgroundColorPaths.addListener(this::updateLayer);
 
+            // Die Auswahl-Hervorhebung wird aus dem Text-Layout berechnet. Beim
+            // Anlegen einer Tabellenzelle hat der TextFlow noch keine Breite: der
+            // Umbruch legt dann jedes Zeichen in eine eigene Zeile. Die so
+            // berechnete Form passt nicht mehr zur Zelle und ragt ueber die
+            // folgenden Zeilen hinaus. Deshalb wird die Form nach jeder
+            // Layoutaenderung des TextFlows neu berechnet.
+            textFlow.layoutBoundsProperty().addListener((obs, old, nv) -> updateSelection(viewModel.getSelection()));
+
             getChildren().addAll(textBackgroundColorPaths);
             getChildren().addAll(selectionShape, caretShape, textFlow);
             getStyleClass().add("layer");
