@@ -33,6 +33,10 @@ import com.gluonhq.richtextarea.Selection;
 import com.gluonhq.richtextarea.model.Block;
 import com.gluonhq.richtextarea.model.Decoration;
 import com.gluonhq.richtextarea.model.Document;
+import com.gluonhq.richtextarea.model.Field;
+import com.gluonhq.richtextarea.model.FieldDecoration;
+import com.gluonhq.richtextarea.model.Fields;
+import com.gluonhq.richtextarea.model.ParagraphDecoration;
 import com.gluonhq.richtextarea.model.TableDecoration;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.text.TextAlignment;
@@ -181,6 +185,19 @@ public final class ActionCmdFactory {
 
     public ActionCmd decorate(Decoration... decorations) {
         return new ActionCmdDecorate(decorations);
+    }
+
+    public ActionCmd insertPageBreak() {
+        ParagraphDecoration pageBreakDecoration = ParagraphDecoration.builder()
+                .presets()
+                .pageBreakBefore(true)
+                .build();
+        return new ActionCmdDecorate(pageBreakDecoration);
+    }
+
+    public ActionCmd insertField(Field field) {
+        FieldDecoration fieldDecoration = new FieldDecoration(field);
+        return new ActionCmdDecorate(fieldDecoration);
     }
 
     public ActionCmd caretMove(Direction direction, KeyEvent event) {

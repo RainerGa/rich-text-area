@@ -40,4 +40,7 @@ module com.gluonhq.richtextarea {
     exports com.gluonhq.richtextarea.action;
     exports com.gluonhq.richtextarea.model;
     exports com.gluonhq.richtextarea.viewmodel;
+
+    // Allow resource access for CSS files (getUserAgentStylesheet)
+    opens com.gluonhq.richtextarea;
 }

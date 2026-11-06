@@ -33,6 +33,8 @@ import com.gluonhq.richtextarea.Selection;
 import com.gluonhq.richtextarea.model.Block;
 import com.gluonhq.richtextarea.model.Decoration;
 import com.gluonhq.richtextarea.model.Document;
+import com.gluonhq.richtextarea.model.Field;
+import com.gluonhq.richtextarea.model.ParagraphDecoration;
 import com.gluonhq.richtextarea.model.TableDecoration;
 import com.gluonhq.richtextarea.viewmodel.ActionCmdFactory;
 
@@ -170,5 +172,13 @@ public class ActionFactory {
 
     public Action decorate(Decoration... decorations) {
         return new BasicAction(control, action -> ACTION_CMD_FACTORY.decorate(decorations));
+    }
+
+    public Action insertPageBreak() {
+        return new BasicAction(control, action -> ACTION_CMD_FACTORY.insertPageBreak());
+    }
+
+    public Action insertField(Field field) {
+        return new BasicAction(control, action -> ACTION_CMD_FACTORY.insertField(field));
     }
 }

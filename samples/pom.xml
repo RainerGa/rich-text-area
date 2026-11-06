@@ -2,33 +2,40 @@
          xmlns="http://maven.apache.org/POM/4.0.0"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>com.gluonhq</groupId>
+    
+    <parent>
+        <groupId>com.gluonhq</groupId>
+        <artifactId>rich-text-area-parent</artifactId>
+        <version>3.0-RG</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+    
     <artifactId>rich-text-area-samples</artifactId>
-    <version>1.1.0-SNAPSHOT</version>
+    <version>3.0-RG</version>
     <packaging>jar</packaging>
 
     <name>Rich Text Area samples</name>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.release>11</maven.compiler.release>
-        <javafx.version>23.0.1</javafx.version>
+        <maven.compiler.release>21</maven.compiler.release>
+        <javafx.version>25.0.4</javafx.version>
         <javafx.plugin.version>0.0.8</javafx.plugin.version>
         <main.class>com.gluonhq.richtextarea.samples.FullFeaturedDemo</main.class>
         <jpro.version>2022.1.0</jpro.version>
-        <rta.version>1.2.6</rta.version>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>com.gluonhq</groupId>
             <artifactId>rich-text-area</artifactId>
-            <version>${rta.version}</version>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
             <version>${javafx.version}</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.kordamp.ikonli</groupId>

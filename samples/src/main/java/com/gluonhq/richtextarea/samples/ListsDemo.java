@@ -83,7 +83,7 @@ public class ListsDemo extends Application {
         });
         editor.getActionFactory().open(document).execute(new ActionEvent());
 
-        BorderPane root = new BorderPane(editor);
+        BorderPane root = new BorderPane(new ViewModeSwitcher(editor));
         Scene scene = new Scene(root, 600, 500);
         scene.getStylesheets().add(HighlightDemo.class.getResource("listsDemo.css").toExternalForm());
         stage.setScene(scene);

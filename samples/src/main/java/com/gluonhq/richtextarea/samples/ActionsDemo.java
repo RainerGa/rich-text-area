@@ -83,7 +83,7 @@ public class ActionsDemo extends Application {
         RichTextArea editor = new RichTextArea();
         editor.getActionFactory().open(document).execute(new ActionEvent());
 
-        BorderPane root = new BorderPane(editor);
+        BorderPane root = new BorderPane(new ViewModeSwitcher(editor));
 
         // decorate actions
         ToggleButton fontBoldToggle = new ToggleButton("Bold");

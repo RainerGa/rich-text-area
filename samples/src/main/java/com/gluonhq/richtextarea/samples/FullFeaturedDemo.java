@@ -29,6 +29,11 @@ package com.gluonhq.richtextarea.samples;
 
 import com.gluonhq.emoji.Emoji;
 import com.gluonhq.emoji.EmojiData;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
 import com.gluonhq.richtextarea.RichTextArea;
 import com.gluonhq.richtextarea.Selection;
 import com.gluonhq.richtextarea.Tools;
@@ -38,8 +43,15 @@ import com.gluonhq.richtextarea.action.ParagraphDecorateAction;
 import com.gluonhq.richtextarea.action.TextDecorateAction;
 import com.gluonhq.richtextarea.model.DecorationModel;
 import com.gluonhq.richtextarea.model.Document;
+import com.gluonhq.richtextarea.model.Field;
+import com.gluonhq.richtextarea.model.Field.FieldType;
+import com.gluonhq.richtextarea.model.Fields;
+import com.gluonhq.richtextarea.model.HeaderFooter;
 import com.gluonhq.richtextarea.model.ImageDecoration;
+import com.gluonhq.richtextarea.model.PageFormat;
 import com.gluonhq.richtextarea.model.ParagraphDecoration;
+import com.gluonhq.richtextarea.model.Style;
+import com.gluonhq.richtextarea.model.StyleRegistry;
 import com.gluonhq.richtextarea.model.TableDecoration;
 import com.gluonhq.richtextarea.model.TextDecoration;
 import com.gluonhq.richtextarea.samples.popup.EmojiPopup;
@@ -60,6 +72,7 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ColorPicker;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.Tooltip;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.Menu;
@@ -172,6 +185,7 @@ public class FullFeaturedDemo extends Application {
 
     private final Label textLengthLabel = new Label();
     private final RichTextArea editor = new RichTextArea();
+    private final StyleRegistry styleRegistry = StyleRegistry.createDefault();
 
     @Override
     public void start(Stage stage) {
@@ -277,6 +291,8 @@ public class FullFeaturedDemo extends Application {
                 actionEmoji(),
                 actionHyperlink(LineAwesomeSolid.LINK),
                 actionTable(LineAwesomeSolid.TABLE, td -> editor.getActionFactory().insertTable(td)),
+                actionPageBreak(LineAwesomeSolid.FILE_ALT),
+                actionInsertField(LineAwesomeSolid.TEXT_HEIGHT),
                 new Separator(Orientation.VERTICAL));
 
         ToolBar fontsToolbar = new ToolBar();
@@ -310,7 +326,22 @@ public class FullFeaturedDemo extends Application {
                 createToggleButton(LineAwesomeSolid.LIST_OL, property -> new ParagraphDecorateAction<>(editor, property, d -> d.getGraphicType() == NUMBERED_LIST, (builder, a) -> builder.graphicType(a ? NUMBERED_LIST : NONE).build())),
                 createToggleButton(LineAwesomeSolid.LIST_UL, property -> new ParagraphDecorateAction<>(editor, property, d -> d.getGraphicType() == BULLETED_LIST, (builder, a) -> builder.graphicType(a ? BULLETED_LIST : NONE).build())),
                 createSpinner("Indent", p -> new ParagraphDecorateAction<>(editor, p, ParagraphDecoration::getIndentationLevel, (builder, a) -> builder.indentationLevel(a).build())),
-                new Separator(Orientation.VERTICAL)
+                new Separator(Orientation.VERTICAL),
+                createToggleButton(LineAwesomeSolid.ARROW_DOWN, property -> new ParagraphDecorateAction<>(editor, property, ParagraphDecoration::isPageBreakBefore, (builder, a) -> builder.pageBreakBefore(a).build()), "Page Break Before"),
+                createToggleButton(LineAwesomeSolid.ARROW_UP, property -> new ParagraphDecorateAction<>(editor, property, ParagraphDecoration::isPageBreakAfter, (builder, a) -> builder.pageBreakAfter(a).build()), "Page Break After"));
+
+        // Layout Toolbar for Page Format
+        ToolBar layoutToolbar = new ToolBar();
+        layoutToolbar.getItems().setAll(
+                createPageSizeCombo(),
+                createOrientationToggle(),
+                createPageFormatButton(),
+                new Separator(Orientation.VERTICAL),
+                actionInsertHeader(),
+                actionInsertFooter(),
+                actionInsertStyle(),
+                actionInsertField(LineAwesomeSolid.TEXT_HEIGHT),
+                actionPageBreak(LineAwesomeSolid.FILE_ALT)
         );
 
         HBox statusBar = new HBox(10);
@@ -337,12 +368,90 @@ public class FullFeaturedDemo extends Application {
                 actionMenuItem("Copy", LineAwesomeSolid.COPY, editor.getActionFactory().copy()),
                 actionMenuItem("Cut", LineAwesomeSolid.CUT, editor.getActionFactory().cut()),
                 actionMenuItem("Paste", LineAwesomeSolid.PASTE, editor.getActionFactory().paste()));
-        MenuBar menuBar = new MenuBar(fileMenu, editMenu);
+        
+        // Page Layout Menu
+        Menu pageLayoutMenu = new Menu("Page Layout");
+        MenuItem pageBreakItem = new MenuItem("Insert Page Break");
+        pageBreakItem.setOnAction(e -> editor.getActionFactory().insertPageBreak().execute(new ActionEvent()));
+        
+            MenuItem headerItem = new MenuItem("Insert Header");
+            headerItem.setOnAction(e -> {
+                Dialog<HeaderFooter> dialog = createHeaderFooterDialog(HeaderFooter.Type.HEADER);
+                Optional<HeaderFooter> result = dialog.showAndWait();
+                result.ifPresent(header -> {
+                    Document doc = editor.getDocument();
+                    List<HeaderFooter> headersFooters = new ArrayList<>(doc.getHeadersFooters());
+                    headersFooters.add(header);
+                    Document newDoc = new Document(
+                            doc.getText(),
+                            doc.getDecorations(),
+                            doc.getCaretPosition(),
+                            doc.getPageFormat(),
+                            headersFooters
+                    );
+                    editor.getActionFactory().open(newDoc).execute(new ActionEvent());
+                });
+            });
+        
+            MenuItem footerItem = new MenuItem("Insert Footer");
+            footerItem.setOnAction(e -> {
+                Dialog<HeaderFooter> dialog = createHeaderFooterDialog(HeaderFooter.Type.FOOTER);
+                Optional<HeaderFooter> result = dialog.showAndWait();
+                result.ifPresent(footer -> {
+                    Document doc = editor.getDocument();
+                    List<HeaderFooter> headersFooters = new ArrayList<>(doc.getHeadersFooters());
+                    headersFooters.add(footer);
+                    Document newDoc = new Document(
+                            doc.getText(),
+                            doc.getDecorations(),
+                            doc.getCaretPosition(),
+                            doc.getPageFormat(),
+                            headersFooters
+                    );
+                    editor.getActionFactory().open(newDoc).execute(new ActionEvent());
+                });
+            });
+        
+        MenuItem pageFormatItem = new MenuItem("Page Format...");
+        pageFormatItem.setOnAction(e -> {
+            Dialog<PageFormat> dialog = createPageFormatDialog();
+            Optional<PageFormat> result = dialog.showAndWait();
+            result.ifPresent(format -> editor.setPageFormat(format));
+        });
+        
+        MenuItem insertFieldItem = new MenuItem("Insert Field...");
+        insertFieldItem.setOnAction(e -> {
+            Dialog<Field> fieldDialog = createFieldDialog();
+            Optional<Field> result = fieldDialog.showAndWait();
+            result.ifPresent(field -> {
+                editor.getActionFactory().insertField(field).execute(new ActionEvent());
+            });
+        });
+        
+        pageLayoutMenu.getItems().addAll(
+                pageBreakItem,
+                headerItem,
+                footerItem,
+                new SeparatorMenuItem(),
+                insertFieldItem,
+                pageFormatItem
+        );
+        
+        MenuBar menuBar = new MenuBar(fileMenu, editMenu, pageLayoutMenu);
 //        menuBar.setUseSystemMenuBar(true);
 
         editor.setPromptText("Hello!");
-        BorderPane root = new BorderPane(editor);
-        root.setTop(new VBox(menuBar, toolbar, fontsToolbar, paragraphToolbar));
+        
+        // Initialize page format
+        PageFormat initialFormat = PageFormat.builder()
+                .pageSize(PageFormat.PageSize.A4)
+                .orientation(PageFormat.Orientation.PORTRAIT)
+                .margins(new Insets(72, 72, 72, 72))
+                .build();
+        editor.setPageFormat(initialFormat);
+        
+        BorderPane root = new BorderPane(new ViewModeSwitcher(editor));
+        root.setTop(new VBox(menuBar, toolbar, fontsToolbar, paragraphToolbar, layoutToolbar));
         root.setBottom(statusBar);
 
         Scene scene = new Scene(root, 960, 580);
@@ -362,15 +471,6 @@ public class FullFeaturedDemo extends Application {
         button.disableProperty().bind(action.disabledProperty());
         button.setOnAction(action::execute);
         return button;
-    }
-
-    private ToggleButton createToggleButton(Ikon ikon, Function<ObjectProperty<Boolean>, DecorateAction<Boolean>> function) {
-        final ToggleButton toggleButton = new ToggleButton();
-        FontIcon icon = new FontIcon(ikon);
-        icon.setIconSize(20);
-        toggleButton.setGraphic(icon);
-        function.apply(toggleButton.selectedProperty().asObject());
-        return toggleButton;
     }
 
     private HBox createSpinner(String text, Function<ObjectProperty<Integer>, DecorateAction<Integer>> function) {
@@ -621,6 +721,368 @@ public class FullFeaturedDemo extends Application {
                 (int) Math.round(value.getOpacity() * 255));
     }
 
+    // New methods for page layout features
+
+    private Button actionPageBreak(Ikon ikon) {
+        Button button = new Button();
+        FontIcon icon = new FontIcon(ikon);
+        icon.setIconSize(20);
+        button.setGraphic(icon);
+        button.setTooltip(new Tooltip("Insert Page Break"));
+        button.setOnAction(e -> {
+            editor.getActionFactory().insertPageBreak().execute(new ActionEvent());
+        });
+        return button;
+    }
+
+    private Button actionInsertField(Ikon ikon) {
+        Button button = new Button();
+        FontIcon icon = new FontIcon(ikon);
+        icon.setIconSize(20);
+        button.setGraphic(icon);
+        button.setTooltip(new Tooltip("Insert Field"));
+        button.setOnAction(e -> {
+            Dialog<Field> fieldDialog = createFieldDialog();
+            Optional<Field> result = fieldDialog.showAndWait();
+            result.ifPresent(field -> {
+                editor.getActionFactory().insertField(field).execute(new ActionEvent());
+            });
+        });
+        return button;
+    }
+
+    private Dialog<Field> createFieldDialog() {
+        Dialog<Field> dialog = new Dialog<>();
+        dialog.setTitle("Insert Field");
+
+        ButtonType insertButtonType = new ButtonType("Insert", ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().add(insertButtonType);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(20, 20, 10, 10));
+
+        Label fieldTypeLabel = new Label("Field Type:");
+        ComboBox<FieldType> fieldTypeCombo = new ComboBox<>();
+        fieldTypeCombo.getItems().addAll(FieldType.values());
+        fieldTypeCombo.setValue(FieldType.PAGE_NUMBER);
+
+        Label formatLabel = new Label("Format (optional):");
+        TextField formatField = new TextField();
+        formatField.setPromptText("e.g., 'Page #' or 'dd/MM/yyyy'");
+
+        grid.add(fieldTypeLabel, 0, 0);
+        grid.add(fieldTypeCombo, 1, 0);
+        grid.add(formatLabel, 0, 1);
+        grid.add(formatField, 1, 1);
+
+        dialog.getDialogPane().setContent(grid);
+        dialog.setResultConverter(dialogButton -> {
+            if (dialogButton == insertButtonType) {
+                FieldType fieldType = fieldTypeCombo.getValue();
+                String format = formatField.getText();
+                return createField(fieldType, format);
+            }
+            return null;
+        });
+
+        return dialog;
+    }
+
+    private Field createField(FieldType fieldType, String format) {
+        switch (fieldType) {
+            case PAGE_NUMBER:
+                return new Fields.PageNumberField("PageNumber");
+            case PAGE_COUNT:
+                return new Fields.PageCountField("PageCount");
+            case DATE:
+                return new Fields.DateField(format);
+            case TIME:
+                return new Fields.TimeField(format);
+            case DOCUMENT_TITLE:
+                return new Fields.DocumentTitleField("DocumentTitle");
+            case DOCUMENT_AUTHOR:
+                return new Fields.DocumentAuthorField("DocumentAuthor");
+            case FILENAME:
+                return new Fields.FileNameField();
+            case USER_NAME:
+                return new Fields.UserNameField();
+            default:
+                return new Fields.PageNumberField("PageNumber");
+        }
+    }
+
+    private ComboBox<PageFormat.PageSize> createPageSizeCombo() {
+        ComboBox<PageFormat.PageSize> combo = new ComboBox<>();
+        combo.getItems().addAll(PageFormat.PageSize.values());
+        combo.setValue(PageFormat.PageSize.A4);
+        combo.setTooltip(new Tooltip("Select page size"));
+        combo.setPrefWidth(120);
+        return combo;
+    }
+
+    private ToggleButton createOrientationToggle() {
+        ToggleButton toggle = new ToggleButton("Portrait");
+        toggle.setTooltip(new Tooltip("Toggle between Portrait and Landscape"));
+        toggle.setPrefWidth(120);
+        toggle.setOnAction(e -> {
+            PageFormat current = editor.getPageFormat();
+            PageFormat.Orientation newOrientation = toggle.isSelected() ? 
+                    PageFormat.Orientation.LANDSCAPE : PageFormat.Orientation.PORTRAIT;
+            toggle.setText(newOrientation.toString());
+            editor.setPageFormat(PageFormat.builder()
+                    .pageSize(current.getPageSize())
+                    .orientation(newOrientation)
+                    .margins(current.getMargins())
+                    .build());
+        });
+        return toggle;
+    }
+
+    private Button actionInsertHeader() {
+        Button button = new Button();
+        FontIcon icon = new FontIcon(LineAwesomeSolid.ALIGN_CENTER);
+        icon.setIconSize(20);
+        button.setGraphic(icon);
+        button.setTooltip(new Tooltip("Insert Header"));
+        button.setOnAction(e -> {
+            Dialog<HeaderFooter> dialog = createHeaderFooterDialog(HeaderFooter.Type.HEADER);
+            Optional<HeaderFooter> result = dialog.showAndWait();
+            result.ifPresent(header -> {
+                Document doc = editor.getDocument();
+                List<HeaderFooter> headersFooters = new ArrayList<>(doc.getHeadersFooters());
+                headersFooters.add(header);
+                Document newDoc = new Document(
+                        doc.getText(),
+                        doc.getDecorations(),
+                        doc.getCaretPosition(),
+                        doc.getPageFormat(),
+                        headersFooters
+                );
+                editor.getActionFactory().open(newDoc).execute(new ActionEvent());
+            });
+        });
+        return button;
+    }
+
+    private Button actionInsertFooter() {
+        Button button = new Button();
+        FontIcon icon = new FontIcon(LineAwesomeSolid.ALIGN_JUSTIFY);
+        icon.setIconSize(20);
+        button.setGraphic(icon);
+        button.setTooltip(new Tooltip("Insert Footer"));
+        button.setOnAction(e -> {
+            Dialog<HeaderFooter> dialog = createHeaderFooterDialog(HeaderFooter.Type.FOOTER);
+            Optional<HeaderFooter> result = dialog.showAndWait();
+            result.ifPresent(footer -> {
+                Document doc = editor.getDocument();
+                List<HeaderFooter> headersFooters = new ArrayList<>(doc.getHeadersFooters());
+                headersFooters.add(footer);
+                Document newDoc = new Document(
+                        doc.getText(),
+                        doc.getDecorations(),
+                        doc.getCaretPosition(),
+                        doc.getPageFormat(),
+                        headersFooters
+                );
+                editor.getActionFactory().open(newDoc).execute(new ActionEvent());
+            });
+        });
+        return button;
+    }
+
+    private Dialog<HeaderFooter> createHeaderFooterDialog(HeaderFooter.Type type) {
+        Dialog<HeaderFooter> dialog = new Dialog<>();
+        dialog.setTitle("Insert " + (type == HeaderFooter.Type.HEADER ? "Header" : "Footer"));
+
+        ButtonType okButtonType = new ButtonType("OK", ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().add(okButtonType);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(20, 20, 10, 10));
+
+        Label scopeLabel = new Label("Scope:");
+        ComboBox<HeaderFooter.Scope> scopeCombo = new ComboBox<>();
+        scopeCombo.getItems().addAll(HeaderFooter.Scope.values());
+        scopeCombo.setValue(HeaderFooter.Scope.ALL_PAGES);
+
+        Label contentLabel = new Label("Content:");
+        TextField contentField = new TextField();
+        contentField.setPromptText("Enter header/footer text");
+
+        Label heightLabel = new Label("Height (points):");
+        Spinner<Double> heightSpinner = new Spinner<>(new SpinnerValueFactory.DoubleSpinnerValueFactory(10, 200, 36, 1));
+
+        Label distanceLabel = new Label("Distance from edge (points):");
+        Spinner<Double> distanceSpinner = new Spinner<>(new SpinnerValueFactory.DoubleSpinnerValueFactory(0, 100, 18, 1));
+
+        grid.add(scopeLabel, 0, 0);
+        grid.add(scopeCombo, 1, 0);
+        grid.add(contentLabel, 0, 1);
+        grid.add(contentField, 1, 1);
+        grid.add(heightLabel, 0, 2);
+        grid.add(heightSpinner, 1, 2);
+        grid.add(distanceLabel, 0, 3);
+        grid.add(distanceSpinner, 1, 3);
+
+        dialog.getDialogPane().setContent(grid);
+        dialog.setResultConverter(dialogButton -> {
+            if (dialogButton == okButtonType) {
+                return HeaderFooter.builder()
+                        .type(type)
+                        .scope(scopeCombo.getValue())
+                        .content(contentField.getText())
+                        .height(heightSpinner.getValue())
+                        .distanceFromEdge(distanceSpinner.getValue())
+                        .build();
+            }
+            return null;
+        });
+
+        return dialog;
+    }
+
+    private Button actionInsertStyle() {
+        Button button = new Button();
+        FontIcon icon = new FontIcon(LineAwesomeSolid.BRUSH);
+        icon.setIconSize(20);
+        button.setGraphic(icon);
+        button.setTooltip(new Tooltip("Apply Style"));
+        button.setOnAction(e -> {
+            Dialog<Style> dialog = createStyleDialog();
+            Optional<Style> result = dialog.showAndWait();
+            result.ifPresent(style -> {
+                // Apply style to current selection
+                styleRegistry.addStyle(style);
+            });
+        });
+        return button;
+    }
+
+    private Dialog<Style> createStyleDialog() {
+        Dialog<Style> dialog = new Dialog<>();
+        dialog.setTitle("Apply Style");
+
+        ButtonType okButtonType = new ButtonType("OK", ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().add(okButtonType);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(20, 20, 10, 10));
+
+        Label styleLabel = new Label("Style:");
+        ComboBox<Style> styleCombo = new ComboBox<>();
+        styleCombo.getItems().addAll(styleRegistry.getStyles());
+        styleCombo.setValue(styleRegistry.getStyles().isEmpty() ? null : styleRegistry.getStyles().get(0));
+
+        grid.add(styleLabel, 0, 0);
+        grid.add(styleCombo, 1, 0);
+
+        dialog.getDialogPane().setContent(grid);
+        dialog.setResultConverter(dialogButton -> {
+            if (dialogButton == okButtonType) {
+                return styleCombo.getValue();
+            }
+            return null;
+        });
+
+        return dialog;
+    }
+
+    private Button createPageFormatButton() {
+        Button button = new Button("Page Format...");
+        button.setTooltip(new Tooltip("Configure page format settings"));
+        button.setOnAction(e -> {
+            Dialog<PageFormat> dialog = createPageFormatDialog();
+            Optional<PageFormat> result = dialog.showAndWait();
+            result.ifPresent(format -> editor.setPageFormat(format));
+        });
+        return button;
+    }
+
+    private Dialog<PageFormat> createPageFormatDialog() {
+        Dialog<PageFormat> dialog = new Dialog<>();
+        dialog.setTitle("Page Format Settings");
+
+        ButtonType okButtonType = new ButtonType("OK", ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().add(okButtonType);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(20, 20, 10, 10));
+
+        // Page Size
+        Label pageSizeLabel = new Label("Page Size:");
+        ComboBox<PageFormat.PageSize> pageSizeCombo = new ComboBox<>();
+        pageSizeCombo.getItems().addAll(PageFormat.PageSize.values());
+        pageSizeCombo.setValue(editor.getPageFormat().getPageSize());
+
+        // Orientation
+        Label orientationLabel = new Label("Orientation:");
+        ComboBox<PageFormat.Orientation> orientationCombo = new ComboBox<>();
+        orientationCombo.getItems().addAll(PageFormat.Orientation.values());
+        orientationCombo.setValue(editor.getPageFormat().getOrientation());
+
+        // Margins
+        Label marginsLabel = new Label("Margins (points):");
+        Spinner<Double> topMargin = new Spinner<>(new SpinnerValueFactory.DoubleSpinnerValueFactory(0, 144, editor.getPageFormat().getMargins().getTop(), 1));
+        Spinner<Double> rightMargin = new Spinner<>(new SpinnerValueFactory.DoubleSpinnerValueFactory(0, 144, editor.getPageFormat().getMargins().getRight(), 1));
+        Spinner<Double> bottomMargin = new Spinner<>(new SpinnerValueFactory.DoubleSpinnerValueFactory(0, 144, editor.getPageFormat().getMargins().getBottom(), 1));
+        Spinner<Double> leftMargin = new Spinner<>(new SpinnerValueFactory.DoubleSpinnerValueFactory(0, 144, editor.getPageFormat().getMargins().getLeft(), 1));
+
+        HBox marginsBox = new HBox(10, 
+                new Label("Top:"), topMargin,
+                new Label("Right:"), rightMargin,
+                new Label("Bottom:"), bottomMargin,
+                new Label("Left:"), leftMargin);
+
+        grid.add(pageSizeLabel, 0, 0);
+        grid.add(pageSizeCombo, 1, 0);
+        grid.add(orientationLabel, 0, 1);
+        grid.add(orientationCombo, 1, 1);
+        grid.add(marginsLabel, 0, 2);
+        grid.add(marginsBox, 1, 2);
+
+        dialog.getDialogPane().setContent(grid);
+        dialog.setResultConverter(dialogButton -> {
+            if (dialogButton == okButtonType) {
+                return PageFormat.builder()
+                        .pageSize(pageSizeCombo.getValue())
+                        .orientation(orientationCombo.getValue())
+                        .margins(new Insets(topMargin.getValue(), rightMargin.getValue(), bottomMargin.getValue(), leftMargin.getValue()))
+                        .build();
+            }
+            return null;
+        });
+
+        return dialog;
+    }
+
+    private ToggleButton createToggleButton(Ikon ikon, Function<ObjectProperty<Boolean>, DecorateAction<Boolean>> function) {
+        return createToggleButton(ikon, function, null);
+    }
+
+    private ToggleButton createToggleButton(Ikon ikon, Function<ObjectProperty<Boolean>, DecorateAction<Boolean>> function, String tooltip) {
+        final ToggleButton toggleButton = new ToggleButton();
+        FontIcon icon = new FontIcon(ikon);
+        icon.setIconSize(20);
+        toggleButton.setGraphic(icon);
+        if (tooltip != null) {
+            toggleButton.setTooltip(new Tooltip(tooltip));
+        }
+        function.apply(toggleButton.selectedProperty().asObject());
+        return toggleButton;
+    }
+
     public static void main(String[] args) {
         launch(args);
     }
@@ -661,6 +1123,5 @@ public class FullFeaturedDemo extends Application {
         }
     }
 }
-
 
 

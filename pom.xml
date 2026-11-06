@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    
+    <groupId>com.gluonhq</groupId>
+    <artifactId>rich-text-area-parent</artifactId>
+    <version>3.0-RG</version>
+    <packaging>pom</packaging>
+    
+    <name>Rich Text Area Parent</name>
+    <description>Parent POM for Rich Text Area and Samples</description>
+    
+    <modules>
+        <module>rta</module>
+        <module>samples</module>
+    </modules>
+    
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.release>21</maven.compiler.release>
+        <javafx.version>25.0.4</javafx.version>
+    </properties>
+    
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.gluonhq</groupId>
+                <artifactId>rich-text-area</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+</project>

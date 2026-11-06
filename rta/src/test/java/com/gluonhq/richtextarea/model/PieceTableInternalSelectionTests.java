@@ -121,9 +121,42 @@ public class PieceTableInternalSelectionTests {
     public void internalPositionWithSplitPiece() {
         PieceTable pt = new PieceTable(new Document("Hello brave new world"));
         pt.insert("XX", 11);
-        // Die Position zeigt auf das Ende des Textstuecks, in dem sie liegt:
-        // "Hello brave" endet an Position 11, "XX" an Position 13.
-        Assertions.assertEquals(11, pt.getInternalPosition(6));
+        // Ein Textstück darf die genaue Position nicht auf sein Ende verschieben.
+        Assertions.assertEquals(6, pt.getInternalPosition(6));
         Assertions.assertEquals(13, pt.getInternalPosition(13));
     }
+    @Test
+    void exactPositionsRemainStableAcrossTextPieceSplitsAndDeletions() {
+        PieceTable pt = new PieceTable(new Document("Hello brave world"));
+        for (int i = 0; i <= pt.getTextLength(); i++) Assertions.assertEquals(i, pt.getInternalPosition(i));
+        pt.insert("XX", 6); pt.delete(10, 2);
+        for (int i = 0; i <= pt.getTextLength(); i++) Assertions.assertEquals(i, pt.getInternalPosition(i));
+        Assertions.assertEquals(-1, pt.getInternalPosition(-1));
+        Assertions.assertEquals(-1, pt.getInternalPosition(pt.getTextLength() + 1));
+        Assertions.assertEquals(0, new PieceTable(new Document("")).getInternalPosition(0));
+    }
+
+    @Test
+    void emojiPositionsAreAtomicAndFollowingTextHasExactOffsets() {
+        PieceTable pt = new PieceTable(new Document("😀 tail"));
+        Assertions.assertEquals(0, pt.getInternalPosition(0));
+        Assertions.assertEquals(0, pt.getInternalPosition(1));
+        Assertions.assertEquals(1, pt.getInternalPosition(2));
+        Assertions.assertEquals(3, pt.getInternalPosition(4));
+        Assertions.assertEquals(6, pt.getInternalPosition(7));
+    }
+
+    @Test
+    void imageUrlPositionsAreAtomicAndFollowingTextHasExactOffsets() {
+        String url = "local-image.png";
+        PieceTable pt = new PieceTable(new Document(" tail"));
+        pt.decorate(0, 0, new ImageDecoration(url));
+        Assertions.assertEquals(url + " tail", pt.getText());
+        Assertions.assertEquals(0, pt.getInternalPosition(0));
+        Assertions.assertEquals(0, pt.getInternalPosition(url.length() / 2));
+        Assertions.assertEquals(1, pt.getInternalPosition(url.length()));
+        Assertions.assertEquals(3, pt.getInternalPosition(url.length() + 2));
+        Assertions.assertEquals(6, pt.getInternalPosition(url.length() + 5));
+    }
+
 }

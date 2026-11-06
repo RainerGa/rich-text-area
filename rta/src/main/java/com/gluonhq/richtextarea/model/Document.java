@@ -8,7 +8,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
@@ -46,12 +46,16 @@ import java.util.stream.Collectors;
  * whether these can be rendered by a text editor or not. All the indices used by the Document model (like start/length of
  * decorations or caret position) should refer to their position within the full raw text.
  *
+ * The document also contains a {@link PageFormat} that defines the physical page properties for page layout,
+ * and {@link HeaderFooter} instances for headers and footers.
  */
 public class Document implements Serializable {
 
     private final String text;
     private final List<DecorationModel> decorationList;
     private final int caretPosition;
+    private final PageFormat pageFormat;
+    private final java.util.List<HeaderFooter> headersFooters;
 
     public Document() {
         this("");
@@ -64,13 +68,25 @@ public class Document implements Serializable {
     public Document(String text, int caretPosition) {
         this(text,
                 List.of(DecorationModel.createDefaultDecorationModel(text.length())),
-                caretPosition);
+                caretPosition,
+                PageFormat.builder().build(),
+                java.util.List.of());
     }
 
     public Document(String text, List<DecorationModel> decorationList, int caretPosition) {
+        this(text, decorationList, caretPosition, PageFormat.builder().build(), java.util.List.of());
+    }
+
+    public Document(String text, List<DecorationModel> decorationList, int caretPosition, PageFormat pageFormat) {
+        this(text, decorationList, caretPosition, pageFormat, java.util.List.of());
+    }
+
+    public Document(String text, List<DecorationModel> decorationList, int caretPosition, PageFormat pageFormat, java.util.List<HeaderFooter> headersFooters) {
         this.text = text;
         this.decorationList = decorationList;
         this.caretPosition = caretPosition;
+        this.pageFormat = pageFormat != null ? pageFormat : PageFormat.builder().build();
+        this.headersFooters = headersFooters != null ? headersFooters : java.util.List.of();
     }
 
     /**
@@ -106,18 +122,64 @@ public class Document implements Serializable {
         return caretPosition;
     }
 
+    /**
+     * Returns the page format for this document.
+     *
+     * @return the page format
+     */
+    public PageFormat getPageFormat() {
+        return pageFormat;
+    }
+
+    /**
+     * Returns the list of headers and footers for this document.
+     *
+     * @return the list of headers and footers
+     */
+    public java.util.List<HeaderFooter> getHeadersFooters() {
+        return headersFooters;
+    }
+
+    /**
+     * Returns the header for the given scope, or null if not found.
+     *
+     * @param scope the scope
+     * @return the header, or null
+     */
+    public HeaderFooter getHeader(HeaderFooter.Scope scope) {
+        return headersFooters.stream()
+                .filter(hf -> hf.getType() == HeaderFooter.Type.HEADER && hf.getScope() == scope)
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * Returns the footer for the given scope, or null if not found.
+     *
+     * @param scope the scope
+     * @return the footer, or null
+     */
+    public HeaderFooter getFooter(HeaderFooter.Scope scope) {
+        return headersFooters.stream()
+                .filter(hf -> hf.getType() == HeaderFooter.Type.FOOTER && hf.getScope() == scope)
+                .findFirst()
+                .orElse(null);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Document document = (Document) o;
         return Objects.equals(text, document.text) &&
-                Objects.equals(decorationList, document.decorationList);
+                Objects.equals(decorationList, document.decorationList) &&
+                Objects.equals(pageFormat, document.pageFormat) &&
+                Objects.equals(headersFooters, document.headersFooters);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(text, decorationList, caretPosition);
+        return Objects.hash(text, decorationList, caretPosition, pageFormat, headersFooters);
     }
 
     @Override
@@ -127,6 +189,8 @@ public class Document implements Serializable {
                 ", decorationList=" + (decorationList == null ? "null" : "{" +
                     decorationList.stream().map(decorationModel -> " - " + decorationModel.toString()).collect(Collectors.joining("\n", "\n", ""))) +
                 "\n}, caretPosition=" + caretPosition +
+                ", pageFormat=" + pageFormat +
+                ", headersFooters=" + headersFooters +
                 '}';
     }
 }

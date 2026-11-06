@@ -83,7 +83,7 @@ public class HighlightDemo extends Application {
         RichTextArea editor = new RichTextArea();
         editor.getActionFactory().open(document).execute(new ActionEvent());
 
-        BorderPane root = new BorderPane(editor);
+        BorderPane root = new BorderPane(new ViewModeSwitcher(editor));
         Scene scene = new Scene(root, 800, 300);
         scene.getStylesheets().add(HighlightDemo.class.getResource("highlightDemo.css").toExternalForm());
         stage.setScene(scene);

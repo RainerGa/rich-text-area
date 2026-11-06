@@ -87,6 +87,11 @@ class ParagraphTile extends HBox {
 
     private static final double INDENT_PADDING = 20.0;
 
+    // Extra vertical gap rendered before a paragraph that starts a new page
+    // (pageBreakBefore), so page boundaries are visually separated like in
+    // Word/LibreOffice page view.
+    static final double PAGE_SEPARATOR_GAP = 20.0;
+
     // ParagraphTile is HBox
     // | graphicBox | contentPane |
     // If no table, contentPane has single layer of (background + selection + caret shapes, textFlow)
@@ -94,6 +99,10 @@ class ParagraphTile extends HBox {
     //     and has a grid of cxr layers
 
     private Paragraph paragraph;
+    /** Start offset (inclusive) of the document range rendered by this tile. */
+    private int rangeStart;
+    /** End offset (exclusive) of the document range rendered by this tile. */
+    private int rangeEnd;
     private final HBox graphicBox;
     private final Pane contentPane;
 
@@ -102,9 +111,13 @@ class ParagraphTile extends HBox {
     private final RichTextArea control;
     private final RichTextAreaSkin richTextAreaSkin;
     private final RichTextAreaViewModel viewModel;
-    private final ChangeListener<Number> caretPositionListener = (o, ocp, p) -> 
-        Platform.runLater(() -> updateCaretPosition(p.intValue()));
+    private final ChangeListener<Number> caretPositionListener = (o, ocp, p) ->
+        Platform.runLater(this::updateCurrentCaretPosition);
     private final ChangeListener<Selection> selectionListener = (o, os, selection) -> updateSelection(selection);
+
+    private void updateCurrentCaretPosition() {
+        updateCaretPosition(viewModel.getCaretPosition());
+    }
 
     public ParagraphTile(RichTextAreaSkin richTextAreaSkin) {
         this.richTextAreaSkin = richTextAreaSkin;
@@ -125,6 +138,33 @@ class ParagraphTile extends HBox {
     }
 
     void setParagraph(Paragraph paragraph, List<Node> fragments, List<Integer> positions, List<IndexRangeColor> background) {
+        if (paragraph == null) {
+            setParagraphFragment(null, null, null, null, 0, 0);
+            return;
+        }
+        setParagraphFragment(paragraph, fragments, positions, background, paragraph.getStart(), paragraph.getEnd());
+    }
+
+    /**
+     * Renders a fragment of the given paragraph covering the document range
+     * {@code [startOffset, endOffset]}. This allows a single paragraph to be split
+     * across multiple pages while keeping one logical document buffer.
+     *
+     * @param paragraph the source paragraph
+     * @param fragments the rendered nodes for the whole paragraph (as produced by the view model)
+     * @param positions the document start offset of each fragment
+     * @param background background index ranges for the whole paragraph
+     * @param startOffset inclusive start of the range rendered by this tile
+     * @param endOffset exclusive end of the range rendered by this tile
+     */
+    void setParagraphFragment(Paragraph paragraph, List<Node> fragments, List<Integer> positions,
+                              List<IndexRangeColor> background, int startOffset, int endOffset) {
+        setParagraphFragment(paragraph, fragments, positions, background, startOffset, endOffset, true, true);
+    }
+
+    void setParagraphFragment(Paragraph paragraph, List<Node> fragments, List<Integer> positions,
+                              List<IndexRangeColor> background, int startOffset, int endOffset,
+                              boolean firstFragment, boolean lastFragment) {
         layers.forEach(Layer::reset);
         layers.clear();
         graphicBox.getChildren().clear();
@@ -132,6 +172,8 @@ class ParagraphTile extends HBox {
         viewModel.caretPositionProperty().removeListener(caretPositionListener);
         viewModel.selectionProperty().removeListener(selectionListener);
         this.paragraph = paragraph;
+        this.rangeStart = startOffset;
+        this.rangeEnd = endOffset;
         if (paragraph == null) {
             contentPane.setPrefWidth(0);
             return;
@@ -145,22 +187,50 @@ class ParagraphTile extends HBox {
                 contentPane.getChildren().add(gridBox);
                 contentPane.setPrefWidth(gridBox.getPrefWidth());
                 contentPane.requestLayout();
-                // Update caret position after table content is set, since the caretPositionListener
-                // may have fired before the TextFlow was populated with content
                 Platform.runLater(() -> updateCaretPosition(viewModel.getCaretPosition()));
             }
         } else {
-            Layer layer = new Layer(paragraph.getStart(), paragraph.getEnd(), false);
-            layer.setContent(fragments, background, decoration);
+            Layer layer = new Layer(rangeStart, rangeEnd, false);
+            // Keep only the fragments that fall within the rendered range.
+            List<Node> rangeFragments = new ArrayList<>();
+            List<Integer> rangePositions = new ArrayList<>();
+            if (decoration.hasTableDecoration()) {
+                for (int i = 0; i < fragments.size(); i++) {
+                    int fStart = positions.get(i);
+                    int fEnd = i + 1 < positions.size() ? positions.get(i + 1) : endOffset;
+                    if (fEnd <= rangeStart || fStart >= rangeEnd) {
+                        continue;
+                    }
+                    rangeFragments.add(fragments.get(i));
+                    rangePositions.add(Math.max(fStart, rangeStart));
+                }
+            } else {
+                rangeFragments.addAll(fragments);
+            }
+            // Keep only background ranges that fall within the rendered range,
+            // shifted to be relative to the start of this fragment.
+            List<IndexRangeColor> rangeBackground = new ArrayList<>();
+            if (background != null) {
+                for (IndexRangeColor range : background) {
+                    int bStart = Math.max(range.getStart(), rangeStart);
+                    int bEnd = Math.min(range.getEnd(), rangeEnd);
+                    if (bEnd > bStart) {
+                        rangeBackground.add(new IndexRangeColor(bStart - rangeStart, bEnd - rangeStart, range.getColor()));
+                    }
+                }
+            }
+            layer.setContent(rangeFragments, rangeBackground, decoration, firstFragment, lastFragment);
             layers.add(layer);
             contentPane.getChildren().add(layer);
-            // Update caret position after content is set, since the caretPositionListener
-            // may fire before the TextFlow has been laid out (e.g. after line wrap)
             Platform.runLater(() -> updateCaretPosition(viewModel.getCaretPosition()));
             contentPane.setPrefWidth(layer.getPrefWidth());
-            updateGraphicBox(layer, control.getParagraphGraphicFactory());
+            updateGraphicBox(layer, control.getParagraphGraphicFactory(), firstFragment, lastFragment);
             contentPane.requestLayout();
         }
+    }
+
+    int getRangeStart() {
+        return rangeStart;
     }
 
     private HBox createGridBox(List<Node> fragments, List<Integer> positions, List<IndexRangeColor> background, ParagraphDecoration decoration) {
@@ -189,7 +259,7 @@ class ParagraphTile extends HBox {
                             int p = (int) n.getProperties().getOrDefault(TABLE_SEPARATOR, -1);
                             return (positions.get(tableIndex) <= p && p < positions.get(tableIndex + 1));
                         })
-                        .collect(Collectors.toList()), background, pd);
+                        .collect(Collectors.toList()), background, pd, true, true);
                 // Use available width per column instead of fixed 100px
                 double cellWidth = richTextAreaSkin.textFlowPrefWidthProperty.get() / c;
                 layer.updatePrefWidth(cellWidth);
@@ -212,17 +282,19 @@ class ParagraphTile extends HBox {
         return gridBox;
     }
 
-    private void updateGraphicBox(Layer layer, BiFunction<Integer, ParagraphDecoration.GraphicType, Node> graphicFactory) {
+    private void updateGraphicBox(Layer layer, BiFunction<Integer, ParagraphDecoration.GraphicType, Node> graphicFactory,
+                                  boolean firstFragment, boolean lastFragment) {
         ParagraphDecoration decoration = paragraph.getDecoration();
         int indentationLevel = decoration.getIndentationLevel();
         Node graphicNode = null;
-        if (graphicFactory != null) {
+        if (firstFragment && graphicFactory != null) {
             graphicNode = graphicFactory.apply(indentationLevel, decoration.getGraphicType());
         }
         double spanPrefWidth = Math.max((indentationLevel - (graphicNode == null ? 0 : 1)) * INDENT_PADDING, 0d);
 
         double rightPadding = (graphicNode == null) ? 0d : 2d;
-        graphicBox.setPadding(new Insets(decoration.getTopInset(), rightPadding, decoration.getBottomInset(), 0));
+        graphicBox.setPadding(new Insets(firstFragment ? decoration.getTopInset() : 0,
+                rightPadding, lastFragment ? decoration.getBottomInset() : 0, 0));
 
         if (graphicNode == null) {
             graphicBox.setMinWidth(spanPrefWidth);
@@ -357,6 +429,14 @@ class ParagraphTile extends HBox {
         return layers.stream().anyMatch(Layer::hasCaret);
     }
 
+    Bounds getCaretBounds(Node target, int caretPosition) {
+        return layers.stream()
+                .map(layer -> layer.getCaretBounds(target, caretPosition))
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+    }
+
     void resetCaret() {
         layers.stream().filter(Layer::hasCaret).findFirst().ifPresent(Layer::reset);
     }
@@ -470,17 +550,23 @@ class ParagraphTile extends HBox {
             return textFlow.prefWidth(textFlow.getPrefHeight()) + 2;
         }
 
-        void setContent(List<Node> fragments, List<IndexRangeColor> background, ParagraphDecoration decoration) {
-            textFlow.getChildren().setAll(fragments);
-            textFlow.setTextAlignment(decoration.getAlignment());
-            textFlow.setLineSpacing(decoration.getSpacing());
-            textFlow.setPadding(new Insets(decoration.getTopInset(), decoration.getRightInset(), decoration.getBottomInset(), decoration.getLeftInset()));
-
-            textFlowLayoutX = 1d + decoration.getLeftInset();
-            textFlowLayoutY = 1d + decoration.getTopInset();
-
-            Platform.runLater(() -> addBackgroundPathsToLayers(background));
+    void setContent(List<Node> fragments, List<IndexRangeColor> background, ParagraphDecoration decoration,
+                    boolean firstFragment, boolean lastFragment) {
+        textFlow.getChildren().setAll(fragments);
+        textFlow.setTextAlignment(decoration.getAlignment());
+        textFlow.setLineSpacing(decoration.getSpacing());
+        double topInset = firstFragment ? decoration.getTopInset() : 0;
+        if (firstFragment && decoration.isPageBreakBefore()) {
+            topInset += PAGE_SEPARATOR_GAP;
         }
+        double bottomInset = lastFragment ? decoration.getBottomInset() : 0;
+        textFlow.setPadding(new Insets(topInset, decoration.getRightInset(), bottomInset, decoration.getLeftInset()));
+
+        textFlowLayoutX = 1d + decoration.getLeftInset();
+        textFlowLayoutY = 1d + topInset;
+
+        Platform.runLater(() -> addBackgroundPathsToLayers(background));
+    }
 
         void reset() {
             caretTimeline.stop();
@@ -514,9 +600,10 @@ class ParagraphTile extends HBox {
                 Selection prevSelection = viewModel.getSelection();
                 int prevCaretPosition = viewModel.getCaretPosition();
                 int insertionIndex = hitInfo.getInsertionIndex();
-                if (insertionIndex >= 0) {
-                    // get global insertion point, preventing insertionIndex after linefeed
-                    int globalInsertionIndex = Math.min(start + insertionIndex, getParagraphLimit() - 1);
+                if (insertionIndex >= 0 || viewModel.isEmptyParagraph(paragraph)) {
+                    // An empty final flow can report no character hit. Its paragraph
+                    // still has a valid caret position at the start.
+                    int globalInsertionIndex = Math.max(start, Math.min(start + insertionIndex, getParagraphLimit() - 1));
                     if (!(e.isControlDown() || e.isAltDown() || e.isShiftDown() || e.isMetaDown() || e.isShortcutDown())) {
                         if (e.getClickCount() != 3 && viewModel.isEmptyParagraph(paragraph)) {
                             // Word/LibreOffice: a click on an empty line always places the
@@ -635,6 +722,19 @@ class ParagraphTile extends HBox {
             return !caretShape.getElements().isEmpty();
         }
 
+        Bounds getCaretBounds(Node target, int caretPosition) {
+            if (caretPosition < start || caretPosition >= getParagraphLimit()) {
+                return null;
+            }
+            PathElement[] caretElements = textFlow.caretShape(caretPosition - start, true);
+            if (caretElements.length == 0) {
+                return null;
+            }
+            Path caret = new Path(caretElements);
+            Bounds sceneBounds = textFlow.localToScene(caret.getLayoutBounds());
+            return target.sceneToLocal(sceneBounds);
+        }
+
         private void updateCaretPosition(int caretPosition) {
             caretShape.getElements().clear();
             if ((!control.isFocused() && richTextAreaSkin.dragAndDropStart == -1) ||
@@ -714,8 +814,8 @@ class ParagraphTile extends HBox {
         }
 
         private int getParagraphLimit() {
-            int limit = end;
-            if (paragraph.equals(richTextAreaSkin.getLastParagraph())) {
+            int limit = rangeEnd;
+            if (paragraph.equals(richTextAreaSkin.getLastParagraph()) && rangeEnd == paragraph.getEnd()) {
                 // at the end of the last paragraph there is no linefeed, so we need
                 // an extra position for the caret
                 limit += 1;

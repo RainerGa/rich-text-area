@@ -224,6 +224,12 @@ class RichListCell extends ListCell<Paragraph> {
                     richTextAreaSkin.nonTextNodes.incrementAndGet();
                 }
             }, item.getStart(), item.getEnd());
+            // A final empty paragraph has no model fragment (not even a linefeed).
+            // Give it the same view-only glyph as other empty lines so its flow
+            // has a line height and a clickable area. Never insert it in the buffer.
+            if (fragments.isEmpty()) {
+                fragments.add(zeroWidthLinefeed());
+            }
             paragraphTile.setParagraph(item, fragments, positions, backgroundIndexRanges);
             setGraphic(paragraphTile);
             // required: update caret and selection

@@ -151,20 +151,23 @@ public final class PieceTable extends AbstractTextBuffer {
         if (position < 0) {
             return position;
         }
-        s0 = -1;
-        StringBuilder sb = new StringBuilder();
+        int[] exportedOffset = {0};
+        int[] result = {-1};
         walkPieces((p, i, tp) -> {
             Unit unit = p.getUnit();
-            String text = exportableText(p, unit);
-            int sbMin = sb.length();
-            int sbMax = sbMin + text.length();
-            if (sbMin <= position && position <= sbMax) {
-                s0 = tp + p.length;
+            int exportedLength = exportableText(p, unit).length();
+            int end = exportedOffset[0] + exportedLength;
+            if (exportedOffset[0] <= position && position <= end) {
+                // Text fragments preserve exact offsets, even after a piece was split.
+                // Emoji, images and blocks occupy one atomic internal unit. A position
+                // inside their exported spelling stays at its leading edge.
+                result[0] = unit instanceof TextUnit ? tp + position - exportedOffset[0]
+                        : position == end ? tp + p.length : tp;
             }
-            sb.append(text);
-            return (s0 > -1);
+            exportedOffset[0] = end;
+            return result[0] >= 0;
         });
-        return s0;
+        return position == 0 && getTextLength() == 0 ? 0 : result[0];
     }
 
     /**
@@ -274,8 +277,9 @@ public final class PieceTable extends AbstractTextBuffer {
             });
         }
         if (mergedList.isEmpty()) {
-            // provide a default decoration
-            mergedList.add(DecorationModel.createDefaultDecorationModel(0));
+            // An empty paragraph may still carry a table or other block style.
+            // Export that structure instead of silently reverting it to prose.
+            mergedList.add(new DecorationModel(0, 0, getDecorationAtCaret(start), getParagraphDecorationAtCaret(start)));
         }
         return mergedList;
     }
@@ -375,6 +379,8 @@ public final class PieceTable extends AbstractTextBuffer {
         int index = 0;
         for (; index < pieces.size(); index++) {
             Piece piece = pieces.get(index);
+            if (piece.length == 0 && textPosition == caretPosition && index == pieces.size() - 1)
+                return piece.getParagraphDecoration();
             if (textPosition <= caretPosition && caretPosition < textPosition + piece.length) {
                 return piece.getParagraphDecoration();
             }

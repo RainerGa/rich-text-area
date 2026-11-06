@@ -89,7 +89,7 @@ public class BasicDocumentDemo extends Application {
         Document document = new Document(text, List.of(decorationModel), text.length());
         RichTextArea richTextArea = new RichTextArea();
         richTextArea.getActionFactory().open(document).execute(new ActionEvent());
-        StackPane root = new StackPane(richTextArea);
+        StackPane root = new StackPane(new ViewModeSwitcher(richTextArea));
         Scene scene = new Scene(root, 640, 480);
         stage.setScene(scene);
         stage.setTitle("RichTextArea");
