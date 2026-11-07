@@ -63,7 +63,7 @@ public class TableDemo extends Application {
     public void start(Stage stage) {
         RichTextArea editor = new RichTextArea();
         editor.getActionFactory().open(getDocument()).execute(new ActionEvent());
-        BorderPane root = new BorderPane(editor);
+        BorderPane root = new BorderPane(new ViewModeSwitcher(editor));
         Scene scene = new Scene(root, 800, 600);
         scene.getStylesheets().add(TableDemo.class.getResource("tableDemo.css").toExternalForm());
         stage.setScene(scene);

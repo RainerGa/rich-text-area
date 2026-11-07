@@ -13,17 +13,22 @@
     <url>https://github.com/gluonhq/rich-text-area</url>
 
     <properties>
+        <!-- Allow Maven checks to use a separate output directory from the IDE. -->
+        <mardexas.build.directory>${project.basedir}/target</mardexas.build.directory>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>21</maven.compiler.release>
         <!-- Angeglichen an das RichMarkDownEditor-Projekt (JavaFX 25.0.4) -->
         <javafx.version>25.0.4</javafx.version>
         <gpg.plugin.version>3.2.7</gpg.plugin.version>
-        <emoji.version>1.1.0</emoji.version>
+        <emoji.version>1.1.0-mardexas-1</emoji.version>
         <test.headless/>
         <test.javafx.version>26-ea+18</test.javafx.version>
         <!-- Die Testsuite der Bibliothek (TestFX/Monocle) ist nicht Teil des
              Projekt-Builds; das Projekt bringt eigene UI-Tests mit. -->
         <skipTests>true</skipTests>
+        <!-- Also skip compilation: the upstream test sources target a different
+             API revision. Mardexas exercises the fork through editor GUI tests. -->
+        <maven.test.skip>true</maven.test.skip>
         <!-- Quell-/Javadoc-Jars nur beim Deployment erzeugen -->
         <maven.source.skip>true</maven.source.skip>
         <maven.javadoc.skip>true</maven.javadoc.skip>
@@ -37,13 +42,8 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>com.gluonhq.emoji</groupId>
-            <artifactId>emoji</artifactId>
-            <version>${emoji.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.gluonhq.emoji</groupId>
-            <artifactId>offline</artifactId>
+            <groupId>de.richmarkdown</groupId>
+            <artifactId>emoji-noto</artifactId>
             <version>${emoji.version}</version>
         </dependency>
 
@@ -137,6 +137,7 @@
     </repositories>
 
     <build>
+        <directory>${mardexas.build.directory}</directory>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

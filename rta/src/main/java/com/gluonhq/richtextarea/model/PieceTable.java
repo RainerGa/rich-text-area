@@ -151,19 +151,23 @@ public final class PieceTable extends AbstractTextBuffer {
         if (position < 0) {
             return position;
         }
-        s0 = -1;
-        StringBuilder sb = new StringBuilder();
+        int[] exportedOffset = {0};
+        int[] result = {-1};
         walkPieces((p, i, tp) -> {
             Unit unit = p.getUnit();
-            int sbMin = sb.length();
-            int sbMax = sbMin + unit.getText().length();
-            if (sbMin <= position && position <= sbMax) {
-                s0 = tp + p.length;
+            int exportedLength = exportableText(p, unit).length();
+            int end = exportedOffset[0] + exportedLength;
+            if (exportedOffset[0] <= position && position <= end) {
+                // Text fragments preserve exact offsets, even after a piece was split.
+                // Emoji, images and blocks occupy one atomic internal unit. A position
+                // inside their exported spelling stays at its leading edge.
+                result[0] = unit instanceof TextUnit ? tp + position - exportedOffset[0]
+                        : position == end ? tp + p.length : tp;
             }
-            sb.append(unit.getText());
-            return (s0 > -1);
+            exportedOffset[0] = end;
+            return result[0] >= 0;
         });
-        return s0;
+        return position == 0 && getTextLength() == 0 ? 0 : result[0];
     }
 
     /**
@@ -191,22 +195,42 @@ public final class PieceTable extends AbstractTextBuffer {
         StringBuilder sb = new StringBuilder();
         walkPieces((p, i, tp) -> {
             Unit unit = p.getUnit();
+            String text = exportableText(p, unit);
             int sbMin = sb.length();
             int deltaMin = unit instanceof TextUnit ?
                     Math.max(0, start - sbMin) : 0;
-            int sbMax = Math.min(end, sbMin + unit.getText().length());
+            int sbMax = Math.min(end, sbMin + text.length());
             int deltaMax = unit instanceof TextUnit ?
-                    Math.max(0, (sbMin + unit.getText().length()) - end) : 0;
+                    Math.max(0, (sbMin + text.length()) - end) : 0;
             if (sbMin <= start && start <= sbMax) {
                 s0 = tp + deltaMin;
             }
             if (sbMin <= end && end <= sbMax) {
                 s1 = tp + p.length - deltaMax;
             }
-            sb.append(unit.getText());
+            sb.append(text);
             return (s0 > -1 && s1 > -1);
         });
         return new Selection(s0, s1);
+    }
+
+    /**
+     * The exportable text of a piece.
+     *
+     * <p>For a text unit the exportable text is the text that the piece covers, which can be
+     * less than the text of the unit, when the piece only spans a part of it. This happens
+     * whenever the text of a unit is edited, e.g. when a word in a table cell is replaced: the
+     * piece is then split into several pieces, and every piece covers only a part of the unit.
+     *
+     * <p>For all other units (emoji, image, block) the exportable text is the text of the unit
+     * itself, that can be longer than the internal text of the piece.
+     *
+     * @param piece the piece
+     * @param unit the unit of the piece
+     * @return the exportable text of the piece
+     */
+    private static String exportableText(Piece piece, Unit unit) {
+        return unit instanceof TextUnit ? piece.getInternalText() : unit.getText();
     }
 
     /**
@@ -253,8 +277,9 @@ public final class PieceTable extends AbstractTextBuffer {
             });
         }
         if (mergedList.isEmpty()) {
-            // provide a default decoration
-            mergedList.add(DecorationModel.createDefaultDecorationModel(0));
+            // An empty paragraph may still carry a table or other block style.
+            // Export that structure instead of silently reverting it to prose.
+            mergedList.add(new DecorationModel(0, 0, getDecorationAtCaret(start), getParagraphDecorationAtCaret(start)));
         }
         return mergedList;
     }
@@ -354,6 +379,8 @@ public final class PieceTable extends AbstractTextBuffer {
         int index = 0;
         for (; index < pieces.size(); index++) {
             Piece piece = pieces.get(index);
+            if (piece.length == 0 && textPosition == caretPosition && index == pieces.size() - 1)
+                return piece.getParagraphDecoration();
             if (textPosition <= caretPosition && caretPosition < textPosition + piece.length) {
                 return piece.getParagraphDecoration();
             }
@@ -969,7 +996,9 @@ class TextDecorateCmd extends AbstractCommand<PieceTable> {
 
         pt.walkPieces((piece, pieceIndex, textPosition) -> {
             if (isPieceInSelection(piece, textPosition)) {
-                startPieceIndex[0] = pieceIndex;
+                if (removals.isEmpty()) {
+                    startPieceIndex[0] = pieceIndex;
+                }
                 if (textPosition <= start) {
                     int offset = start - textPosition;
                     int length;
@@ -1075,7 +1104,9 @@ class ParagraphDecorateCmd extends AbstractCommand<PieceTable> {
         pt.walkPieces((piece, pieceIndex, textPosition) -> {
             int pieceEndPosition = textPosition + piece.length + (start == pt.getTextLength() ? 0 : - 1);
             if (start <= pieceEndPosition && (end >= pieceEndPosition || end >= textPosition)) {
-                startPieceIndex[0] = pieceIndex;
+                if (removals.isEmpty()) {
+                    startPieceIndex[0] = pieceIndex;
+                }
                 if (start == pt.getTextLength()) {
                     int offset = start - textPosition;
                     if (offset > 0) {

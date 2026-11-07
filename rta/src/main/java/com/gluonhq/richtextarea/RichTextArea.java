@@ -31,7 +31,10 @@ import com.gluonhq.emoji.EmojiSkinTone;
 import com.gluonhq.richtextarea.action.ActionFactory;
 import com.gluonhq.richtextarea.model.Decoration;
 import com.gluonhq.richtextarea.model.Document;
+import com.gluonhq.richtextarea.model.HeaderFooter;
+import com.gluonhq.richtextarea.model.PageFormat;
 import com.gluonhq.richtextarea.model.ParagraphDecoration;
+import com.gluonhq.richtextarea.model.StyleRegistry;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ObjectProperty;
@@ -57,6 +60,8 @@ import javafx.scene.control.Control;
 import javafx.scene.control.SkinBase;
 import javafx.scene.input.DataFormat;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -239,6 +244,62 @@ public class RichTextArea extends Control {
         contentAreaWidthProperty.set(value);
     }
     private final DoubleProperty contentAreaWidthProperty = new SimpleDoubleProperty(this, "contentAreaWidth", 0d);
+
+    // pageFormatProperty
+    /**
+     * The {@link PageFormat page format} defines the physical page properties for the document,
+     * including page size, orientation, and margins. This is used for page layout and printing.
+     *
+     * By default, it is set to A4 portrait with 1-inch margins.
+     *
+     * @return the page format property
+     */
+    public final ObjectProperty<PageFormat> pageFormatProperty() {
+        return pageFormatProperty;
+    }
+    public final PageFormat getPageFormat() {
+        return pageFormatProperty.get();
+    }
+    public final void setPageFormat(PageFormat value) {
+        pageFormatProperty.set(value);
+    }
+    private final ObjectProperty<PageFormat> pageFormatProperty = new SimpleObjectProperty<>(this, "pageFormat", PageFormat.builder().build());
+
+    // headersFootersProperty
+    /**
+     * The list of headers and footers for the document.
+     * Headers and footers can be positioned on all pages, first page only, or left/right pages.
+     *
+     * @return the headers and footers property
+     */
+    public final ObjectProperty<List<HeaderFooter>> headersFootersProperty() {
+        return headersFootersProperty;
+    }
+    public final List<HeaderFooter> getHeadersFooters() {
+        return headersFootersProperty.get();
+    }
+    public final void setHeadersFooters(List<HeaderFooter> value) {
+        headersFootersProperty.set(value);
+    }
+    private final ObjectProperty<List<HeaderFooter>> headersFootersProperty = new SimpleObjectProperty<>(this, "headersFooters", new ArrayList<>());
+
+    // styleRegistryProperty
+    /**
+     * The style registry for the document.
+     * Contains all available styles for text and paragraphs.
+     *
+     * @return the style registry property
+     */
+    public final ObjectProperty<StyleRegistry> styleRegistryProperty() {
+        return styleRegistryProperty;
+    }
+    public final StyleRegistry getStyleRegistry() {
+        return styleRegistryProperty.get();
+    }
+    public final void setStyleRegistry(StyleRegistry value) {
+        styleRegistryProperty.set(value);
+    }
+    private final ObjectProperty<StyleRegistry> styleRegistryProperty = new SimpleObjectProperty<>(this, "styleRegistry", StyleRegistry.createDefault());
 
     // paragraphGraphicFactoryProperty
     /**

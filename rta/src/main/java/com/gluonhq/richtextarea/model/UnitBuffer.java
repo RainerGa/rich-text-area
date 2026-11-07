@@ -29,7 +29,6 @@ package com.gluonhq.richtextarea.model;
 
 
 import com.gluonhq.emoji.Emoji;
-import com.gluonhq.emoji.util.TextUtils;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -238,7 +237,7 @@ public class UnitBuffer {
      */
     public static UnitBuffer convertTextToUnits(String text) {
         List<Unit> units = new ArrayList<>();
-        TextUtils.convertToStringAndEmojiObjects(text).stream()
+        EmojiTextSplitter.split(text).stream()
                 .map(o -> {
                     if (o instanceof Emoji) {
                         return List.of(new EmojiUnit((Emoji) o));

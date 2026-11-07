@@ -51,8 +51,9 @@ public class TextDecoration implements Decoration {
     private Boolean strikethrough;
     private Boolean underline;
     private String url;
+    private String codeLanguage;
 
-    private TextDecoration() {}
+    TextDecoration() {}
 
     /**
      * Gets the foreground color of the text.
@@ -122,6 +123,42 @@ public class TextDecoration implements Decoration {
         return fontWeight;
     }
 
+    public void setForeground(String foreground) {
+        this.foreground = foreground;
+    }
+
+    public void setBackground(String background) {
+        this.background = background;
+    }
+
+    public void setFontFamily(String fontFamily) {
+        this.fontFamily = fontFamily;
+    }
+
+    public void setFontSize(double fontSize) {
+        this.fontSize = fontSize;
+    }
+
+    public void setFontPosture(FontPosture fontPosture) {
+        this.fontPosture = fontPosture;
+    }
+
+    public void setFontWeight(FontWeight fontWeight) {
+        this.fontWeight = fontWeight;
+    }
+
+    public void setStrikethrough(Boolean strikethrough) {
+        this.strikethrough = strikethrough;
+    }
+
+    public void setUnderline(Boolean underline) {
+        this.underline = underline;
+    }
+
+    public void setURL(String url) {
+        this.url = url;
+    }
+
     /**
      * Gets if the text has strike-through formatting.
      *
@@ -161,6 +198,9 @@ public class TextDecoration implements Decoration {
      *
      * @return a {@link TextDecoration.Builder}
      */
+    /** Optional fenced-code info string; editor metadata, never displayed as a link. */
+    public String getCodeLanguage() { return codeLanguage == null ? "" : codeLanguage; }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -187,6 +227,7 @@ public class TextDecoration implements Decoration {
         td.strikethrough = Objects.requireNonNullElse(strikethrough, decoration.strikethrough);
         td.underline = Objects.requireNonNullElse(underline, decoration.underline);
         td.url = url == null ? decoration.url : url;
+        td.codeLanguage = codeLanguage == null ? decoration.codeLanguage : codeLanguage;
         return td;
     }
 
@@ -203,12 +244,12 @@ public class TextDecoration implements Decoration {
                 fontWeight == that.fontWeight &&
                 Objects.equals(strikethrough, that.strikethrough) &&
                 Objects.equals(underline, that.underline) &&
-                Objects.equals(url, that.url);
+                Objects.equals(url, that.url) && Objects.equals(codeLanguage, that.codeLanguage);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(foreground, background, fontFamily, fontSize, fontPosture, fontWeight, strikethrough, underline, url);
+        return Objects.hash(foreground, background, fontFamily, fontSize, fontPosture, fontWeight, strikethrough, underline, url, codeLanguage);
     }
 
     public static class Builder {
@@ -222,6 +263,7 @@ public class TextDecoration implements Decoration {
         private Boolean strikethrough;
         private Boolean underline;
         private String url;
+        private String codeLanguage;
 
         private Builder() {}
 
@@ -236,6 +278,7 @@ public class TextDecoration implements Decoration {
             decoration.strikethrough = this.strikethrough;
             decoration.underline = this.underline;
             decoration.url = this.url;
+            decoration.codeLanguage = this.codeLanguage;
             return decoration;
         }
 
@@ -249,6 +292,7 @@ public class TextDecoration implements Decoration {
             strikethrough = false;
             underline = false;
             url = null;
+            codeLanguage = "";
             return this;
         }
 
@@ -262,6 +306,16 @@ public class TextDecoration implements Decoration {
             strikethrough = decoration.strikethrough;
             underline = decoration.underline;
             url = decoration.url;
+            codeLanguage = decoration.codeLanguage;
+            return this;
+        }
+
+        /** Stores a CommonMark fence info string; null means inherit during normalization. */
+        public Builder codeLanguage(String language) {
+            if (language != null && (language.indexOf('\n') >= 0 || language.indexOf('\r') >= 0)) {
+                throw new IllegalArgumentException("Code language cannot contain line breaks");
+            }
+            this.codeLanguage = language;
             return this;
         }
 

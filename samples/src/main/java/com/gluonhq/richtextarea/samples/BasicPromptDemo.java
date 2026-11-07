@@ -91,7 +91,7 @@ public class BasicPromptDemo extends Application {
         editor.setPromptText("Type something!");
         editor.setPadding(new Insets(20));
 
-        BorderPane root = new BorderPane(editor);
+        BorderPane root = new BorderPane(new ViewModeSwitcher(editor));
         Scene scene = new Scene(root, 800, 600);
         stage.setScene(scene);
         stage.setTitle("RichTextArea");

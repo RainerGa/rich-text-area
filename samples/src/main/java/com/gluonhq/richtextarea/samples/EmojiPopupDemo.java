@@ -91,8 +91,9 @@ public class EmojiPopupDemo extends Application {
             emojiPopup.show(emojiButton);
         });
 
-        HBox root = new HBox(20, editor, emojiButton);
-        HBox.setHgrow(editor, Priority.ALWAYS);
+        ViewModeSwitcher viewSwitcher = new ViewModeSwitcher(editor);
+        HBox root = new HBox(20, viewSwitcher, emojiButton);
+        HBox.setHgrow(viewSwitcher, Priority.ALWAYS);
         root.getStyleClass().add("root-box");
 
         Scene scene = new Scene(root, 600, 300);

@@ -64,8 +64,11 @@ public class ParagraphDecoration implements Decoration {
     private Double topInset, rightInset, bottomInset, leftInset;
     private int indentationLevel = -1;
     private GraphicType graphicType;
+    private int startNumber = -1;
 
     private TableDecoration tableDecoration;
+    private boolean pageBreakBefore = false;
+    private boolean pageBreakAfter = false;
 
     private ParagraphDecoration() {}
 
@@ -158,6 +161,17 @@ public class ParagraphDecoration implements Decoration {
     }
 
     /**
+     * Returns the start number for numbered lists.
+     *
+     * @defaultValue 1
+     *
+     * @return the start number (>= 1)
+     */
+    public int getStartNumber() {
+        return startNumber <= 0 ? 1 : startNumber;
+    }
+
+    /**
      * Returns true if the paragraph decoration has a {@link TableDecoration}
      *
      * @return true if the paragraph has a table
@@ -173,6 +187,24 @@ public class ParagraphDecoration implements Decoration {
      */
     public TableDecoration getTableDecoration() {
         return tableDecoration;
+    }
+
+    /**
+     * Returns true if a page break should be inserted before this paragraph.
+     *
+     * @return true if page break before
+     */
+    public boolean isPageBreakBefore() {
+        return pageBreakBefore;
+    }
+
+    /**
+     * Returns true if a page break should be inserted after this paragraph.
+     *
+     * @return true if page break after
+     */
+    public boolean isPageBreakAfter() {
+        return pageBreakAfter;
     }
 
     /**
@@ -205,7 +237,10 @@ public class ParagraphDecoration implements Decoration {
         pd.leftInset = Objects.requireNonNullElse(leftInset, decoration.leftInset);
         pd.indentationLevel = indentationLevel < 0 ? decoration.indentationLevel : indentationLevel;
         pd.graphicType = Objects.requireNonNullElse(graphicType, decoration.graphicType);
+        pd.startNumber = startNumber <= 0 ? (decoration != null ? decoration.startNumber : -1) : startNumber;
         pd.tableDecoration = Objects.requireNonNullElse(tableDecoration, decoration.tableDecoration);
+        pd.pageBreakBefore = pageBreakBefore || decoration.pageBreakBefore;
+        pd.pageBreakAfter = pageBreakAfter || decoration.pageBreakAfter;
         return pd;
     }
 
@@ -214,20 +249,23 @@ public class ParagraphDecoration implements Decoration {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         ParagraphDecoration that = (ParagraphDecoration) o;
-        return Double.compare(that.spacing, spacing) == 0 &&
-                Double.compare(that.topInset, topInset) == 0 &&
-                Double.compare(that.rightInset, rightInset) == 0 &&
-                Double.compare(that.bottomInset, bottomInset) == 0 &&
-                Double.compare(that.leftInset, leftInset) == 0 &&
+        return Objects.equals(that.spacing, spacing) &&
+                Objects.equals(that.topInset, topInset) &&
+                Objects.equals(that.rightInset, rightInset) &&
+                Objects.equals(that.bottomInset, bottomInset) &&
+                Objects.equals(that.leftInset, leftInset) &&
                 that.indentationLevel == indentationLevel &&
                 that.graphicType == graphicType &&
                 that.alignment == alignment &&
-                Objects.equals(that.tableDecoration, tableDecoration);
+                that.getStartNumber() == getStartNumber() &&
+                Objects.equals(that.tableDecoration, tableDecoration) &&
+                that.pageBreakBefore == pageBreakBefore &&
+                that.pageBreakAfter == pageBreakAfter;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(spacing, alignment, topInset, rightInset, bottomInset, leftInset, indentationLevel, graphicType, tableDecoration);
+        return Objects.hash(spacing, alignment, topInset, rightInset, bottomInset, leftInset, indentationLevel, graphicType, getStartNumber(), tableDecoration, pageBreakBefore, pageBreakAfter);
     }
 
     @Override
@@ -236,7 +274,8 @@ public class ParagraphDecoration implements Decoration {
                 "s=" + spacing +
                 ", a=" + alignment +
                 ", [" + topInset + ", " + rightInset + ", " + bottomInset + ", " + leftInset + "]" +
-                ", i=" + indentationLevel + ", type=" + graphicType + ", " + tableDecoration + "}";
+                ", i=" + indentationLevel + ", type=" + graphicType + ", start=" + getStartNumber() + ", " + tableDecoration +
+                ", pbBefore=" + pageBreakBefore + ", pbAfter=" + pageBreakAfter + "}";
     }
 
     public static class Builder {
@@ -245,7 +284,10 @@ public class ParagraphDecoration implements Decoration {
         private Double topInset, rightInset, bottomInset, leftInset;
         private int indentationLevel = -1;
         private GraphicType graphicType;
+        private int startNumber = -1;
         private TableDecoration tableDecoration;
+        private boolean pageBreakBefore = false;
+        private boolean pageBreakAfter = false;
 
         private Builder() {}
 
@@ -259,7 +301,10 @@ public class ParagraphDecoration implements Decoration {
             decoration.leftInset = this.leftInset;
             decoration.indentationLevel = this.indentationLevel;
             decoration.graphicType = this.graphicType;
+            decoration.startNumber = this.startNumber;
             decoration.tableDecoration = tableDecoration;
+            decoration.pageBreakBefore = this.pageBreakBefore;
+            decoration.pageBreakAfter = this.pageBreakAfter;
             return decoration;
         }
 
@@ -272,7 +317,10 @@ public class ParagraphDecoration implements Decoration {
             leftInset = 0d;
             indentationLevel = 0;
             graphicType = GraphicType.NONE;
+            startNumber = 1;
             tableDecoration = new TableDecoration();
+            pageBreakBefore = false;
+            pageBreakAfter = false;
             return this;
         }
 
@@ -285,7 +333,10 @@ public class ParagraphDecoration implements Decoration {
             this.leftInset = decoration.leftInset;
             this.indentationLevel = decoration.indentationLevel;
             this.graphicType = decoration.graphicType;
+            this.startNumber = decoration.startNumber;
             this.tableDecoration = decoration.tableDecoration;
+            this.pageBreakBefore = decoration.pageBreakBefore;
+            this.pageBreakAfter = decoration.pageBreakAfter;
             return this;
         }
 
@@ -335,6 +386,11 @@ public class ParagraphDecoration implements Decoration {
             return this;
         }
 
+        public Builder startNumber(int startNumber) {
+            this.startNumber = Math.max(1, startNumber);
+            return this;
+        }
+
         public Builder indentationLevel(int indentationLevel) {
             this.indentationLevel = indentationLevel;
             this.graphicType = indentationLevel == 0 ? GraphicType.NONE : graphicType;
@@ -355,6 +411,16 @@ public class ParagraphDecoration implements Decoration {
 
         public Builder tableDecoration(TableDecoration tableDecoration) {
             this.tableDecoration = tableDecoration;
+            return this;
+        }
+
+        public Builder pageBreakBefore(boolean pageBreakBefore) {
+            this.pageBreakBefore = pageBreakBefore;
+            return this;
+        }
+
+        public Builder pageBreakAfter(boolean pageBreakAfter) {
+            this.pageBreakAfter = pageBreakAfter;
             return this;
         }
     }

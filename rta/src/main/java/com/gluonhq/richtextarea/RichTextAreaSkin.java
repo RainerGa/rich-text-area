@@ -31,6 +31,8 @@ import com.gluonhq.emoji.EmojiSkinTone;
 import com.gluonhq.richtextarea.model.Decoration;
 import com.gluonhq.richtextarea.model.Document;
 import com.gluonhq.richtextarea.model.ImageDecoration;
+import com.gluonhq.richtextarea.model.BlockUnit;
+import com.gluonhq.richtextarea.model.PageFormat;
 import com.gluonhq.richtextarea.model.Paragraph;
 import com.gluonhq.richtextarea.model.ParagraphDecoration;
 import com.gluonhq.richtextarea.model.PieceTable;
@@ -38,6 +40,7 @@ import com.gluonhq.richtextarea.model.Table;
 import com.gluonhq.richtextarea.model.TableDecoration;
 import com.gluonhq.richtextarea.model.TextBuffer;
 import com.gluonhq.richtextarea.model.TextDecoration;
+import com.gluonhq.richtextarea.model.TextUnit;
 import com.gluonhq.richtextarea.model.UnitBuffer;
 import com.gluonhq.richtextarea.viewmodel.ActionCmd;
 import com.gluonhq.richtextarea.viewmodel.ActionCmdFactory;
@@ -68,6 +71,8 @@ import javafx.css.StyleablePropertyFactory;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.geometry.Bounds;
+import javafx.geometry.Insets;
+import javafx.geometry.Orientation;
 import javafx.geometry.Point2D;
 import javafx.scene.Cursor;
 import javafx.scene.Group;
@@ -78,11 +83,13 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.ScrollBar;
 import javafx.scene.control.Skin;
 import javafx.scene.control.SkinBase;
 import javafx.scene.control.skin.ListViewSkin;
 import javafx.scene.control.skin.VirtualFlow;
 import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.ContextMenuEvent;
 import javafx.scene.input.DragEvent;
 import javafx.scene.input.Dragboard;
@@ -101,6 +108,7 @@ import javafx.scene.text.FontPosture;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
+import javafx.scene.text.TextFlow;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -335,6 +343,8 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
 
     private final ParagraphListView paragraphListView;
     private final SortedList<Paragraph> paragraphSortedList = new SortedList<>(viewModel.getParagraphList(), Comparator.comparing(Paragraph::getStart));
+    private final javafx.collections.transformation.FilteredList<Paragraph> visibleParagraphs =
+            new javafx.collections.transformation.FilteredList<>(paragraphSortedList);
 
     final ContextMenu contextMenu = new ContextMenu();
     private ObservableList<MenuItem> tableCellContextMenuItems;
@@ -349,6 +359,9 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
     private final Map<Integer, Font> fontCache = new ConcurrentHashMap<>();
     private final Map<String, Image> imageCache = new ConcurrentHashMap<>();
     private final SmartTimer objectsCacheEvictionTimer;
+    private boolean pageViewMode;
+    private boolean typewriterMode;
+    private boolean focusCurrentParagraph;
 
     private final Consumer<TextBuffer.Event> textChangeListener = e -> refreshTextFlow();
     int lastValidCaretPosition = -1;
@@ -400,6 +413,7 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
                 getSkinnable().caretRowColumnProperty.bind(caretRowColumnProperty);
                 promptNode.visibleProperty().bind(promptVisibleBinding);
                 promptNode.fontProperty().bind(promptFontBinding);
+                requestCaretVisibilityAfterLayout();
             } else {
                 // unbind control properties from viewModel properties, to avoid forwarding
                 // the internal changes of the latter, while it performs an action
@@ -458,26 +472,44 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
                 externalCaret = text.length();
             }
             getSkinnable().caretPosition.set(externalCaret);
-            viewModel.getParagraphWithCaret()
-                    .ifPresent(paragraph -> Platform.runLater(paragraphListView::scrollIfNeeded));
+            updateParagraphFocus();
+            if (caret >= 0) requestCaretVisibilityAfterLayout();
         }
     };
 
     private final InvalidationListener focusListener;
+    private boolean pointerCaretPlacement;
+    private final EventHandler<MouseEvent> pointerCaretHandler = event -> {
+        if (event.getEventType() == MouseEvent.MOUSE_PRESSED) {
+            pointerCaretPlacement = true;
+            // A pointer already addresses visible content. An older keyboard/focus
+            // request must not scroll that content away during hit testing.
+            caretVisibilityRequested = false;
+        } else if (event.getEventType() == MouseEvent.MOUSE_RELEASED) {
+            pointerCaretPlacement = false;
+        }
+    };
     private final EventHandler<DragEvent> dndHandler = this::dndListener;
 
     private final ChangeListener<Boolean> tableAllowedListener;
     private final ChangeListener<EmojiSkinTone> skinToneChangeListener;
+    private final ChangeListener<PageFormat> pageFormatListener;
 
     private final ResourceBundle resources;
 
     private class RichVirtualFlow extends VirtualFlow<ListCell<Paragraph>> {
 
+        private final ReadOnlyObjectProperty<Bounds> clippedBounds;
+
         RichVirtualFlow(RichTextArea control) {
-            ReadOnlyObjectProperty<Bounds> clippedBounds = lookup(".clipped-container").layoutBoundsProperty();
+            clippedBounds = lookup(".clipped-container").layoutBoundsProperty();
+            bindTextFlowPrefWidth(control);
+        }
+
+        void bindTextFlowPrefWidth(RichTextArea control) {
             textFlowPrefWidthProperty.bind(Bindings.createDoubleBinding(() -> control.getContentAreaWidth() > 0 ?
                     control.getContentAreaWidth() :
-                            clippedBounds.get().getWidth() > 0 ? clippedBounds.get().getWidth() - 10 : -1,
+                    clippedBounds.get().getWidth() > 0 ? clippedBounds.get().getWidth() - 10 : -1,
                     control.contentAreaWidthProperty(), clippedBounds));
         }
 
@@ -485,6 +517,22 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
         protected void rebuildCells() {
             super.rebuildCells();
         }
+    }
+
+    void restoreTextFlowPrefWidthBinding() {
+        paragraphListView.virtualFlow.bindTextFlowPrefWidth(getSkinnable());
+    }
+
+    void setPageViewMode(boolean pageViewMode) {
+        if (this.pageViewMode == pageViewMode) {
+            return;
+        }
+        this.pageViewMode = pageViewMode;
+        if (pageViewMode) {
+            return;
+        }
+        paragraphListView.updateLayout();
+        computeFullHeight();
     }
 
     private class ParagraphListView extends ListView<Paragraph> {
@@ -630,22 +678,64 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
 
         void scrollIfNeeded() {
             final Bounds vfBounds = virtualFlow.localToScene(virtualFlow.getBoundsInLocal());
+            double viewportMinX = vfBounds.getMinX();
+            double viewportMaxX = vfBounds.getMaxX();
             double viewportMinY = vfBounds.getMinY();
             double viewportMaxY = vfBounds.getMaxY();
+
+            // Find horizontal scrollbar (may not exist if content fits)
+            final ScrollBar hbar = findHorizontalScrollBar();
+
             caret().ifPresentOrElse(caret -> {
                 final Bounds bounds = caret.localToScene(caret.getBoundsInLocal());
+                double minX = bounds.getMinX();
+                double maxX = bounds.getMaxX();
                 double minY = bounds.getMinY();
                 double maxY = bounds.getMaxY();
-                if (!(maxY <= viewportMaxY && minY >= viewportMinY)) {
+
+                // Vertical scrolling (existing logic)
+                if (typewriterMode) {
+                    virtualFlow.scrollPixels((minY + maxY - viewportMinY - viewportMaxY) / 2);
+                } else if (!(maxY <= viewportMaxY && minY >= viewportMinY)) {
                     // If caret is not fully visible, scroll line by line as needed
                     virtualFlow.scrollPixels(maxY > viewportMaxY ?
                             maxY - viewportMaxY + 1 : minY - viewportMinY - 1);
+                }
+
+                // Horizontal scrolling (new logic)
+                if (hbar != null && hbar.isVisible() && !(maxX <= viewportMaxX && minX >= viewportMinX)) {
+                    // Caret is horizontally outside viewport - scroll to make it visible
+                    double hValue = hbar.getValue();
+                    double hMin = hbar.getMin();
+                    double hMax = hbar.getMax();
+
+                    if (maxX > viewportMaxX) {
+                        // Caret is to the right of viewport - scroll right
+                        double overshoot = maxX - viewportMaxX;
+                        double newValue = Math.min(hMax, hValue + overshoot + 5); // +5 for padding
+                        hbar.setValue(newValue);
+                    } else if (minX < viewportMinX) {
+                        // Caret is to the left of viewport - scroll left
+                        double overshoot = viewportMinX - minX;
+                        double newValue = Math.max(hMin, hValue - overshoot - 5); // -5 for padding
+                        hbar.setValue(newValue);
+                    }
                 }
             }, () -> {
                 // In case no caret was found (paragraph is not in a listCell yet),
                 // scroll directly to the paragraph
                 viewModel.getParagraphWithCaret().ifPresent(this::scrollTo);
             });
+        }
+
+        private ScrollBar findHorizontalScrollBar() {
+            for (Node node : virtualFlow.lookupAll(".scroll-bar")) {
+                if (node instanceof ScrollBar bar
+                        && bar.getOrientation() == Orientation.HORIZONTAL) {
+                    return bar;
+                }
+            }
+            return null;
         }
     }
 
@@ -677,10 +767,14 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
         resources = ResourceBundle.getBundle("com.gluonhq.richtextarea.rich-text-area");
 
         paragraphListView = new ParagraphListView(control);
-        paragraphListView.setItems(paragraphSortedList);
+        paragraphListView.setItems(visibleParagraphs);
         paragraphListView.setFocusTraversable(false);
         getChildren().add(paragraphListView);
-        paragraphListView.setCellFactory(p -> new RichListCell(this));
+        paragraphListView.setCellFactory(p -> {
+            RichListCell cell = new RichListCell(this);
+            cell.itemProperty().addListener((obs, old, paragraph) -> applyParagraphFocus(cell));
+            return cell;
+        });
         objectsCacheEvictionTimer = new SmartTimer(paragraphListView::evictUnusedObjects, 1000, 60000);
         controlPrefWidthListener = (obs, ov, nv) -> {
             refreshTextFlow();
@@ -690,7 +784,17 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
         tableAllowedListener = (obs, ov, nv) -> viewModel.setTableAllowed(nv);
         skinToneChangeListener = (obs, ov, nv) -> refreshTextFlow();
 
-        focusListener = o -> paragraphListView.updateLayout();
+        focusListener = o -> {
+            paragraphListView.updateLayout();
+            if (control.isFocused()) requestCaretVisibilityAfterLayout();
+        };
+
+        // page format listener
+        pageFormatListener = (obs, ov, nv) -> {
+            refreshTextFlow();
+            paragraphListView.updateLayout();
+        };
+        getSkinnable().pageFormatProperty().addListener(pageFormatListener);
 
         control.documentProperty().addListener((obs, ov, nv) -> {
             if (viewModel.isSaved()) {
@@ -727,10 +831,12 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
         promptNode.fillProperty().unbind();
         getSkinnable().editableProperty().removeListener(this::editableChangeListener);
         getSkinnable().tableAllowedProperty().removeListener(tableAllowedListener);
+        getSkinnable().pageFormatProperty().removeListener(pageFormatListener);
         getSkinnable().setOnKeyPressed(null);
         getSkinnable().setOnKeyTyped(null);
         getSkinnable().widthProperty().removeListener(controlPrefWidthListener);
         getSkinnable().focusedProperty().removeListener(focusListener);
+        getSkinnable().removeEventFilter(MouseEvent.ANY, pointerCaretHandler);
         getSkinnable().removeEventHandler(DragEvent.ANY, dndHandler);
         getSkinnable().skinToneProperty().removeListener(skinToneChangeListener);
         contextMenu.getItems().clear();
@@ -745,6 +851,47 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
 
     public RichTextAreaViewModel getViewModel() {
         return viewModel;
+    }
+
+    /** Filters rendered paragraphs only. The text buffer, document export and undo history stay intact. */
+    public void setParagraphVisibility(java.util.function.IntPredicate predicate) {
+        visibleParagraphs.setPredicate(predicate == null ? null : paragraph -> predicate.test(paragraph.getStart()));
+        paragraphListView.updateLayout();
+    }
+
+    /** Snapshot of currently rendered paragraph starts, in internal editor coordinates. */
+    public java.util.List<Integer> getVisibleParagraphStarts() {
+        return visibleParagraphs.stream().map(Paragraph::getStart).toList();
+    }
+
+    /** Reveals a search/navigation target without changing caret, selection, or document. */
+    public void revealParagraph(int internalPosition) {
+        Paragraph target = null;
+        for (Paragraph paragraph : paragraphSortedList) {
+            if (paragraph.getStart() > internalPosition) break;
+            target = paragraph;
+        }
+        if (target != null && !visibleParagraphs.contains(target)) setParagraphVisibility(null);
+    }
+
+    /** Display-only writing modes; never alters text or decorations. */
+    public void setTypewriterMode(boolean enabled) { typewriterMode = enabled; }
+    public boolean isTypewriterMode() { return typewriterMode; }
+    public void setFocusCurrentParagraph(boolean enabled) {
+        focusCurrentParagraph = enabled;
+        updateParagraphFocus();
+    }
+    public boolean isFocusCurrentParagraph() { return focusCurrentParagraph; }
+    private void applyParagraphFocus(RichListCell cell) {
+        Paragraph paragraph = cell.getItem();
+        int caret = viewModel.getCaretPosition();
+        cell.setOpacity(!focusCurrentParagraph || paragraph == null
+                || caret >= paragraph.getStart() && caret <= paragraph.getEnd() ? 1 : 0.35);
+    }
+    private void updateParagraphFocus() {
+        if (paragraphListView == null) return;
+        paragraphListView.lookupAll(".list-cell").stream().filter(RichListCell.class::isInstance)
+                .map(RichListCell.class::cast).forEach(this::applyParagraphFocus);
     }
 
     Map<Integer, Font> getFontCache() {
@@ -780,6 +927,7 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
         getSkinnable().setOnKeyTyped(this::keyTypedListener);
         getSkinnable().widthProperty().addListener(controlPrefWidthListener);
         getSkinnable().focusedProperty().addListener(focusListener);
+        getSkinnable().addEventFilter(MouseEvent.ANY, pointerCaretHandler);
         getSkinnable().addEventHandler(DragEvent.ANY, dndHandler);
         getSkinnable().skinToneProperty().addListener(skinToneChangeListener);
         refreshTextFlow();
@@ -842,8 +990,12 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
             nonTextNodes.set(0);
             viewModel.resetCharacterIterator();
             // this ensures changes in decoration are applied:
-            paragraphListView.updateLayout();
-            computeFullHeight();
+            if (!pageViewMode) {
+                paragraphListView.updateLayout();
+            }
+            if (!pageViewMode) {
+                computeFullHeight();
+            }
 
             if (nonTextNodesCount != nonTextNodes.get()) {
                 // when number of images changes, caret
@@ -863,10 +1015,37 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
     private void editableChangeListener(Observable o) {
         boolean editable = getSkinnable().isEditable();
         viewModel.setEditable(editable);
-        viewModel.setCaretPosition(editable ? lastValidCaretPosition : -1);
+        // Read-only hides the caret in ParagraphTile, but its logical position
+        // remains necessary for selection, table export and chapter navigation.
+        if (editable && viewModel.getCaretPosition() < 0) viewModel.setCaretPosition(lastValidCaretPosition);
+        paragraphListView.updateLayout();
         paragraphListView.setCursor(editable ? Cursor.TEXT : Cursor.DEFAULT);
         populateContextMenu(editable);
-        Platform.runLater(paragraphListView::scrollIfNeeded);
+        requestCaretVisibilityAfterLayout();
+    }
+
+    private boolean caretVisibilityPending;
+    private boolean caretVisibilityRequested;
+
+    /** Rebuilding cells on focus/command completion can invalidate an earlier scroll request. */
+    private void requestCaretVisibilityAfterLayout() {
+        if (pointerCaretPlacement) return;
+        var scene = getSkinnable().getScene();
+        if (scene == null) return;
+        caretVisibilityRequested = true;
+        if (caretVisibilityPending) return;
+        caretVisibilityPending = true;
+        scene.addPostLayoutPulseListener(new Runnable() {
+            @Override public void run() {
+                scene.removePostLayoutPulseListener(this);
+                caretVisibilityPending = false;
+                boolean requested = caretVisibilityRequested;
+                caretVisibilityRequested = false;
+                if (requested && !pointerCaretPlacement && getSkinnable().getScene() == scene && getSkinnable().getSkin() == RichTextAreaSkin.this
+                        && viewModel.getCaretPosition() >= 0) paragraphListView.scrollIfNeeded();
+            }
+        });
+        Platform.requestNextPulse();
     }
 
     private void requestLayout() {
@@ -941,6 +1120,9 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
 
     private void keyPressedListener(KeyEvent e) {
         long a0 = System.nanoTime();
+        if (pageViewMode && (e.getCode() == UP || e.getCode() == DOWN)) {
+            paragraphListView.updateLayout();
+        }
         // Find an applicable action and execute it if found
         for (KeyCombination kc : INPUT_MAP.keySet()) {
             if (kc.match(e)) {
@@ -989,7 +1171,150 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
     }
 
     private void computeFullHeight() {
-        // TODO
+        double totalHeight = 0;
+        // Measure every paragraph directly instead of relying on visible VirtualFlow cells.
+        // The VirtualFlow only materializes cells for the visible viewport, so summing
+        // cell.getHeight() would under-report the true document height for multi-page content.
+        for (Paragraph paragraph : paragraphSortedList) {
+            totalHeight += measureParagraphHeight(paragraph);
+        }
+        fullHeightProperty.set(totalHeight);
+    }
+
+    /**
+     * Measures the rendered height of a single paragraph at the given content width,
+     * without depending on a VirtualFlow cell being materialized for it.
+     * Replicates the same TextFlow layout that {@link RichListCell} uses to render the paragraph.
+     *
+     * @param paragraph the paragraph to measure
+     * @param contentWidth the available content width in pixels
+     * @return the rendered height of the paragraph
+     */
+    public double measureParagraphHeight(Paragraph paragraph, double contentWidth) {
+        if (paragraph == null) {
+            return 0;
+        }
+        ParagraphDecoration decoration = paragraph.getDecoration();
+        double width = contentWidth > 0 ? contentWidth : defaultContentWidth();
+
+        TextFlow textFlow = new TextFlow();
+        textFlow.setPrefWidth(width);
+        textFlow.setTextAlignment(decoration.getAlignment());
+        textFlow.setLineSpacing(decoration.getSpacing());
+        double topInset = decoration.getTopInset();
+        if (decoration.isPageBreakBefore()) {
+            topInset += ParagraphTile.PAGE_SEPARATOR_GAP;
+        }
+        textFlow.setPadding(new Insets(topInset, decoration.getRightInset(), decoration.getBottomInset(), decoration.getLeftInset()));
+
+        viewModel.walkFragments((unit, dec) -> {
+            if (dec instanceof TextDecoration && !unit.isEmpty()) {
+                String text;
+                if (unit instanceof TextUnit) {
+                    text = unit.getText();
+                } else if (unit instanceof BlockUnit) {
+                    text = ((BlockUnit) unit).getBlock().getContent();
+                } else {
+                    text = null;
+                }
+                if (text != null && !text.isEmpty()) {
+                    textFlow.getChildren().add(createTextNode(text, (TextDecoration) dec));
+                }
+            } else if (dec instanceof ImageDecoration) {
+                textFlow.getChildren().add(createImageView((ImageDecoration) dec));
+            }
+        }, paragraph.getStart(), paragraph.getEnd());
+
+        return textFlow.prefHeight(textFlow.getPrefWidth()) + 1;
+    }
+
+    private double defaultContentWidth() {
+        double width = textFlowPrefWidthProperty.get();
+        if (width <= 0) {
+            width = getSkinnable().getWidth() > 0 ? getSkinnable().getWidth() : 400;
+        }
+        if (width <= 0) {
+            width = 400;
+        }
+        return width;
+    }
+
+    /**
+     * Measures the rendered height of a single paragraph at the current content width,
+     * without depending on a VirtualFlow cell being materialized for it.
+     */
+    private double measureParagraphHeight(Paragraph paragraph) {
+        return measureParagraphHeight(paragraph, defaultContentWidth());
+    }
+
+    private Text createTextNode(String content, TextDecoration decoration) {
+        Text text = new Text(content.replace("\n", ""));
+        Color textColor;
+        try {
+            textColor = Color.web(decoration.getForeground());
+        } catch (Exception e) {
+            textColor = Color.BLACK;
+        }
+        text.setFill(textColor);
+        text.setStrikethrough(decoration.isStrikethrough());
+        text.setUnderline(decoration.isUnderline());
+        int hash = Objects.hash(
+                decoration.getFontFamily(),
+                decoration.getFontWeight(),
+                decoration.getFontPosture(),
+                decoration.getFontSize());
+        Font font = fontCache.computeIfAbsent(hash,
+                h -> Font.font(
+                        decoration.getFontFamily(),
+                        decoration.getFontWeight(),
+                        decoration.getFontPosture(),
+                        decoration.getFontSize()));
+        text.setFont(font);
+        return text;
+    }
+
+    private ImageView createImageView(ImageDecoration imageDecoration) {
+        Image image = imageCache.computeIfAbsent(imageDecoration.getUrl(), Image::new);
+        ImageView imageView = new ImageView(image);
+        double contentWidth = textFlowPrefWidthProperty.get();
+        if (contentWidth <= 0) {
+            contentWidth = 400;
+        }
+        if (imageDecoration.getWidth() > -1 && imageDecoration.getHeight() > -1) {
+            imageView.setFitWidth(imageDecoration.getWidth());
+            imageView.setFitHeight(imageDecoration.getHeight());
+        } else {
+            double width = Math.min(image.getWidth(), contentWidth - 10);
+            imageView.setFitWidth(width);
+            imageView.setPreserveRatio(true);
+        }
+        return imageView;
+    }
+
+    /**
+     * Returns the sorted list of all paragraphs in the document.
+     * Useful for external code that needs to iterate over paragraphs,
+     * for example to calculate automatic page breaks.
+     *
+     * @return list of paragraphs sorted by start position
+     */
+    public List<Paragraph> getParagraphs() {
+        return new ArrayList<>(paragraphSortedList);
+    }
+
+    /**
+     * Returns the height of each paragraph in the document, in the same order as {@link #getParagraphs()}.
+     * Measures every paragraph directly so heights are available even for paragraphs
+     * that don't have a visible VirtualFlow cell yet.
+     *
+     * @return list of paragraph heights
+     */
+    public List<Double> getParagraphHeights() {
+        List<Double> heights = new ArrayList<>(paragraphSortedList.size());
+        for (Paragraph paragraph : paragraphSortedList) {
+            heights.add(measureParagraphHeight(paragraph));
+        }
+        return heights;
     }
 
     private void populateContextMenu(boolean isEditable) {

@@ -672,7 +672,7 @@ public class RichTextAreaViewModel {
             return List.of();
         }
         return paragraphList.stream()
-                .filter(p -> !(p.getStart() > selection.getEnd() || p.getEnd() <= selection.getStart()))
+                .filter(p -> p.getStart() < selection.getEnd() && p.getEnd() > selection.getStart())
                 .collect(Collectors.toList());
     }
 
@@ -822,6 +822,35 @@ public class RichTextAreaViewModel {
         int start = selection.isDefined() ? selection.getStart() : 0;
         int end = selection.isDefined() ? selection.getEnd() : getTextLength();
         return new Document(getTextBuffer().getText(start, end), getTextBuffer().getDecorationModelList(start, end), caret);
+    }
+
+    /** Replaces all contents, including paragraph styles and images, as one undoable edit. */
+    public void replaceDocument(Document document) {
+        replaceDocument(document, Selection.UNDEFINED);
+    }
+
+    /** Result caret and selection use exported document coordinates, including on redo. */
+    public void replaceDocument(Document document, Selection selection) {
+        Objects.requireNonNull(document);
+        Objects.requireNonNull(selection);
+        if (selection.isDefined() && selection.getEnd() > document.getText().length())
+            throw new IllegalArgumentException("Selection outside replacement document");
+        if (!isEditable()) throw new IllegalStateException("Document is read-only");
+        commandManager.execute(new ReplaceDocumentCmd(document, selection));
+    }
+
+    /** Replaces an exported range as one undoable edit; result caret and selection are absolute. */
+    public void replaceRange(int start, int end, Document replacement, Selection selection) {
+        Objects.requireNonNull(replacement);
+        Objects.requireNonNull(selection);
+        int length = getTextBuffer().getText().length();
+        if (start < 0 || end < start || end > length) throw new IllegalArgumentException("Invalid replacement range");
+        int resultLength = length - (end - start) + replacement.getText().length();
+        if (replacement.getCaretPosition() < 0 || replacement.getCaretPosition() > resultLength
+                || selection.isDefined() && selection.getEnd() > resultLength)
+            throw new IllegalArgumentException("Caret or selection outside replacement result");
+        if (!isEditable()) throw new IllegalStateException("Document is read-only");
+        commandManager.execute(new ReplaceDocumentCmd(replacement, selection, start, end));
     }
 
     void newDocument() {

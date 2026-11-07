@@ -1176,6 +1176,42 @@ public class RTATest {
     }
 
     @Test
+    public void twoDigitNumberedListTest(FxRobot robot) {
+        run(() -> {
+            String text = "Line 9\nLine 10\nLine 11";
+            TextDecoration textDecoration = TextDecoration.builder().presets().fontFamily("Arial").build();
+            ParagraphDecoration paragraphDecoration = ParagraphDecoration.builder().presets()
+                    .graphicType(ParagraphDecoration.GraphicType.NUMBERED_LIST)
+                    .startNumber(9)
+                    .indentationLevel(1).build();
+            Document document = new Document(text,
+                    List.of(new DecorationModel(0, text.length(), textDecoration, paragraphDecoration)), text.length());
+            richTextArea.getActionFactory().open(document).execute(new ActionEvent());
+        });
+        waitForFxEvents();
+
+        javafx.scene.text.Font font = javafx.scene.text.Font.font(14);
+        System.out.println("Width '1.': " + Tools.computeStringWidth(font, "1."));
+        System.out.println("Width '9.': " + Tools.computeStringWidth(font, "9."));
+        System.out.println("Width '10.': " + Tools.computeStringWidth(font, "10."));
+        System.out.println("Width '88.': " + Tools.computeStringWidth(font, "88."));
+        System.out.println("Width '99.': " + Tools.computeStringWidth(font, "99."));
+        System.out.println("Width '100.': " + Tools.computeStringWidth(font, "100."));
+
+        List<Node> nodes = getSortedNodes(robot, ".numbered-list-label");
+        assertEquals(3, nodes.size());
+        for (int i = 0; i < 3; i++) {
+            Label label = (Label) nodes.get(i);
+            System.out.println("DEBUG Label " + i + ": text='" + label.getText() + "', width=" + label.getWidth() + ", prefWidth=" + label.prefWidth(-1) + ", minWidth=" + label.getMinWidth() + ", maxWidth=" + label.getMaxWidth() + ", insets=" + label.getInsets());
+            label.lookupAll(".text").forEach(t -> System.out.println("  rendered text node: '" + ((javafx.scene.text.Text)t).getText() + "'"));
+            javafx.scene.Parent parent = label.getParent();
+            if (parent instanceof javafx.scene.layout.Region r) {
+                System.out.println("  DEBUG parent: width=" + r.getWidth() + ", insets=" + r.getInsets() + ", minWidth=" + r.getMinWidth() + ", maxWidth=" + r.getMaxWidth());
+            }
+        }
+    }
+
+    @Test
     public void customNumberedListTest(FxRobot robot) {
         run(() -> {
             String text = "Hello\nRTA";
