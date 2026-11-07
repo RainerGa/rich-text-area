@@ -1,9 +1,17 @@
-This is a fork and not the original!
+This is the RainerGa fork of Gluon's RichTextArea.
+
+## Fork release 3.5-RG
+
+[Download release 3.5-RG](https://github.com/RainerGa/rich-text-area/releases/tag/3.5-RG).
+The bundle includes the required offline Noto emoji dependency, Maven POMs,
+sources, Javadoc and original notices. This fork version is distributed through
+GitHub Releases. See [build and installation instructions](RELEASING.md) and
+[release notes](releases/3.5-RG.md). Requires JDK 25 and JavaFX 25.0.4.
 
 
 [![Gluon](.github/assets/gluon_logo.svg)](https://gluonhq.com)
 
-[![Build](https://github.com/gluonhq/rich-text-area/actions/workflows/build.yml/badge.svg)](https://github.com/gluonhq/rich-text-area/actions/workflows/build.yml)
+[![Build](https://github.com/RainerGa/rich-text-area/actions/workflows/build.yml/badge.svg)](https://github.com/RainerGa/rich-text-area/actions/workflows/build.yml)
 [![Maven Central](https://img.shields.io/maven-central/v/com.gluonhq/rich-text-area)](https://search.maven.org/#search|ga|1|com.gluonhq.rich-text-area)
 [![License](https://img.shields.io/github/license/gluonhq/rich-text-area)](https://opensource.org/licenses/GPL-3.0)
 [![javadoc](https://javadoc.io/badge2/com.gluonhq/rich-text-area/javadoc.svg?color=blue)](https://javadoc.io/doc/com.gluonhq/rich-text-area)
@@ -42,7 +50,7 @@ To use the RichTextArea control in your project add the following dependency:
 <dependency>
     <groupId>com.gluonhq</groupId>
     <artifactId>rich-text-area</artifactId>
-    <version>1.2.0</version>
+    <version>3.5-RG</version>
 </dependency>
  ```
 

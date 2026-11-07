@@ -5,3 +5,4 @@ samples/target/
 /logs/
 /RUNNING_PID
 *.iml
+/integration/

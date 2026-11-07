@@ -1,58 +1,34 @@
 name: Release
 on:
+  push:
+    tags: ['*-RG']
   workflow_dispatch:
-    inputs:
-      nextVersion:
-        description: 'Next development version without "SNAPSHOT". If not provided, the next version will be calculated from the pom'
-        required: false
-        type: string
+
+permissions:
+  contents: read
 
 jobs:
-  pre-release:
-    uses: gluonhq/actions/.github/workflows/maven-pre-release.yml@v1
-    with:
-      buildDir: rta
-      depProperty: rta.version
-      depDirectory: samples
-
+  verify:
+    uses: ./.github/workflows/build.yml
   release:
-    needs: pre-release
-    runs-on: ubuntu-latest
+    needs: verify
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/download-artifact@v8.0.2
         with:
-          ref: ${{ needs.pre-release.outputs.tag }}
-
-      - name: Setup Java and Apache Maven
-        uses: actions/setup-java@v4
-        with:
-          java-version: 25
-          distribution: 'oracle'
-          cache: 'maven'
-          server-id: central
-          server-username: MAVEN_USERNAME
-          server-password: MAVEN_CENTRAL_TOKEN
-          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
-          gpg-passphrase: MAVEN_GPG_PASSPHRASE
-
-      - name: Publish to Maven Central
-        id: deploy
-        run: |
-          ./mvnw -B -ntp -Ptest verify -f rta
-          ./mvnw -B -Dmaven.test.skip=true -Prelease deploy -f rta
-          echo ::set-output name=exit_code::$?
+          name: rich-text-area-release
+          path: target/release
+      - name: Publish verified fork release
         env:
-          MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
-          MAVEN_CENTRAL_TOKEN: ${{ secrets.SONATYPE_PASSWORD }}
-          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-
-  post-release:
-    needs: [ pre-release, release ]
-    uses: gluonhq/actions/.github/workflows/maven-post-release.yml@v1
-    with:
-      tag: ${{ needs.pre-release.outputs.tag }}
-      nextVersion: ${{ github.event.inputs.nextVersion }}
-      buildDir: rta
-      depProperty: rta.version
-      depDirectory: samples
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          version=$(python3 -c 'import xml.etree.ElementTree as E; print(E.parse("rta/pom.xml").findtext("{*}version"))')
+          test "$RELEASE_TAG" = "$version"
+          gh release create "$RELEASE_TAG" target/release/* --verify-tag --latest \
+            --title "Rich Text Area $RELEASE_TAG" --notes-file "releases/$RELEASE_TAG.md"

@@ -6,12 +6,12 @@
     <parent>
         <groupId>com.gluonhq</groupId>
         <artifactId>rich-text-area-parent</artifactId>
-        <version>3.0-RG</version>
+        <version>3.5-RG</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     
     <artifactId>rich-text-area-samples</artifactId>
-    <version>3.0-RG</version>
+    <version>3.5-RG</version>
     <packaging>jar</packaging>
 
     <name>Rich Text Area samples</name>
