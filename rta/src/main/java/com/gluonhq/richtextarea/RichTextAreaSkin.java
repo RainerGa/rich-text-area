@@ -61,7 +61,6 @@ import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.value.ChangeListener;
-import javafx.beans.value.ChangeListener;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.SortedList;
@@ -1290,15 +1289,6 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
             imageView.setPreserveRatio(true);
         }
         return imageView;
-    }
-
-    private RichListCell getCellForParagraph(Paragraph paragraph) {
-        return paragraphListView.getSheet().getChildren().stream()
-                .filter(RichListCell.class::isInstance)
-                .map(RichListCell.class::cast)
-                .filter(cell -> cell.getItem() == paragraph)
-                .findFirst()
-                .orElse(null);
     }
 
     /**

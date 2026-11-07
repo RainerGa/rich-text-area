@@ -34,7 +34,6 @@ import com.gluonhq.richtextarea.model.Block;
 import com.gluonhq.richtextarea.model.Decoration;
 import com.gluonhq.richtextarea.model.Document;
 import com.gluonhq.richtextarea.model.Field;
-import com.gluonhq.richtextarea.model.ParagraphDecoration;
 import com.gluonhq.richtextarea.model.TableDecoration;
 import com.gluonhq.richtextarea.viewmodel.ActionCmdFactory;
 

@@ -35,7 +35,6 @@ import com.gluonhq.richtextarea.model.Decoration;
 import com.gluonhq.richtextarea.model.Document;
 import com.gluonhq.richtextarea.model.Field;
 import com.gluonhq.richtextarea.model.FieldDecoration;
-import com.gluonhq.richtextarea.model.Fields;
 import com.gluonhq.richtextarea.model.ParagraphDecoration;
 import com.gluonhq.richtextarea.model.TableDecoration;
 import javafx.scene.input.KeyEvent;

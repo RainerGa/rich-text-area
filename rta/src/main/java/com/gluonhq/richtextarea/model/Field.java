@@ -2,7 +2,6 @@ package com.gluonhq.richtextarea.model;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
 
 /**
  * Base class for all field types in a document.

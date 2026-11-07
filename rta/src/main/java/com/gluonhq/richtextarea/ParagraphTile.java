@@ -672,9 +672,8 @@ class ParagraphTile extends HBox {
                     .collect(Collectors.toSet()));
         }
 
-        @SuppressWarnings("deprecation")
         double getCaretY() {
-            var pathElements = textFlow.caretShape(0, false);
+            var pathElements = textFlow.getCaretShape(0, false);
             return Stream.of(pathElements)
                     .filter(LineTo.class::isInstance)
                     .map(LineTo.class::cast)
@@ -726,7 +725,7 @@ class ParagraphTile extends HBox {
             if (caretPosition < start || caretPosition >= getParagraphLimit()) {
                 return null;
             }
-            PathElement[] caretElements = textFlow.caretShape(caretPosition - start, true);
+            PathElement[] caretElements = textFlow.getCaretShape(caretPosition - start, true);
             if (caretElements.length == 0) {
                 return null;
             }
@@ -746,11 +745,10 @@ class ParagraphTile extends HBox {
                 caretTimeline.stop();
             } else {
                 // Force full layout (CSS + layout) before querying caret shape to ensure
-                // textFlow.caretShape() calculates positions based on current text content
+                // textFlow.getCaretShape() calculates positions based on current text content
                 textFlow.applyCss();
                 textFlow.layout();
-                @SuppressWarnings("deprecation")
-                var pathElements = textFlow.caretShape(caretPosition - start, true);
+                var pathElements = textFlow.getCaretShape(caretPosition - start, true);
                 if (pathElements.length > 0) {
                     caretShape.getElements().addAll(pathElements);
                 } else if (richTextAreaSkin.lastValidCaretPosition >= 0
@@ -760,7 +758,7 @@ class ParagraphTile extends HBox {
                     // Wiederhole mit der zuletzt bekannten gültigen Position, damit der Cursor sichtbar bleibt.
                     caretShape.getElements().clear();
                     int fallbackPos = richTextAreaSkin.lastValidCaretPosition;
-                    var fallbackElements = textFlow.caretShape(fallbackPos - start, true);
+                    var fallbackElements = textFlow.getCaretShape(fallbackPos - start, true);
                     if (fallbackElements.length > 0) {
                         caretShape.getElements().addAll(fallbackElements);
                         if (caretShape.getLayoutBounds().getHeight() < 5) {

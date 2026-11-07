@@ -13,6 +13,8 @@
     <url>https://github.com/gluonhq/rich-text-area</url>
 
     <properties>
+        <!-- Allow Maven checks to use a separate output directory from the IDE. -->
+        <mardexas.build.directory>${project.basedir}/target</mardexas.build.directory>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>21</maven.compiler.release>
         <!-- Angeglichen an das RichMarkDownEditor-Projekt (JavaFX 25.0.4) -->
@@ -135,6 +137,7 @@
     </repositories>
 
     <build>
+        <directory>${mardexas.build.directory}</directory>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

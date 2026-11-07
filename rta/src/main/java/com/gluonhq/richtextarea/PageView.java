@@ -36,7 +36,6 @@ import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
 import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
-import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.layout.Background;
@@ -45,7 +44,6 @@ import javafx.scene.layout.CornerRadii;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -55,7 +53,6 @@ import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
 import javafx.scene.text.TextFlow;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -330,7 +327,6 @@ public class PageView extends StackPane {
         }
 
         int pageNum = getPageNumber();
-        int totalPages = getTotalPages();
 
         for (HeaderFooter hf : currentHeadersFooters) {
             HeaderFooter.Scope scope = hf.getScope();

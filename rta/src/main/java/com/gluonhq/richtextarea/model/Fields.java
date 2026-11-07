@@ -1,6 +1,7 @@
 package com.gluonhq.richtextarea.model;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 
@@ -13,7 +14,6 @@ public class Fields {
      * A field that displays the current page number.
      */
     public static class PageNumberField extends Field {
-        private static int lastPageCount = 0;
         
         public PageNumberField(String name) {
             super(name, FieldType.PAGE_NUMBER);
@@ -27,7 +27,7 @@ public class Fields {
         }
         
         public void setPageCount(int pageCount) {
-            lastPageCount = pageCount;
+            // Retained for API compatibility; this placeholder does not evaluate page counts.
         }
     }
     
@@ -115,8 +115,7 @@ public class Fields {
         
         @Override
         public String getValue() {
-            return LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) + " " + 
-                   LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+            return LocalDateTime.now().format(formatter);
         }
         
         @Override
