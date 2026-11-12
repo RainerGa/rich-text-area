@@ -59,7 +59,38 @@ public final class PieceTable extends AbstractTextBuffer {
 
     private final PieceCharacterIterator pieceCharacterIterator;
     TextDecoration decorationAtCaret;
-    private DecorationModel dm = null;
+    private int[] pieceEnds;
+
+    @Override
+    protected void fire(TextBuffer.Event event) {
+        pieceEnds = null;
+        super.fire(event);
+    }
+
+    private int firstPieceEndingAfter(int position) {
+        if (pieceEnds == null) {
+            pieceEnds = new int[pieces.size()];
+            int end = 0;
+            for (int i = 0; i < pieces.size(); i++) pieceEnds[i] = (end += pieces.get(i).length);
+        }
+        int lo = 0, hi = pieceEnds.length;
+        while (lo < hi) {
+            int mid = (lo + hi) >>> 1;
+            if (pieceEnds[mid] <= position) lo = mid + 1;
+            else hi = mid;
+        }
+        return lo;
+    }
+
+    private void walkRange(WalkStep step, int start, int end) {
+        int index = firstPieceEndingAfter(start);
+        int position = index == 0 ? 0 : pieceEnds[index - 1];
+        for (; index < pieces.size() && position < end; index++) {
+            Piece piece = pieces.get(index);
+            if (step.process(piece, index, position)) return;
+            position += piece.length;
+        }
+    }
 
     /**
      * Creates a piece table using the original text of a document, and
@@ -122,18 +153,14 @@ public final class PieceTable extends AbstractTextBuffer {
             throw new IllegalArgumentException("End index is not in range");
         }
         StringBuilder textSB = new StringBuilder();
-        StringBuilder sb = new StringBuilder();
-        walkPieces((p, i, tp) -> {
+        walkRange((p, i, tp) -> {
             Unit unit = p.getUnit();
-            sb.append(p.getInternalText());
-            if (start <= tp + p.length && end > tp && !unit.isEmpty()) {
-                String text = sb.substring(Math.max(start, tp), Math.min(end, tp + p.length));
-                if (!text.isEmpty()) {
-                    textSB.append(unit instanceof TextUnit ? text : unit.getText());
-                }
+            if (!unit.isEmpty()) {
+                String text = p.getInternalText().substring(Math.max(start - tp, 0), Math.min(end - tp, p.length));
+                if (!text.isEmpty()) textSB.append(unit instanceof TextUnit ? text : unit.getText());
             }
-            return (end <= tp);
-        });
+            return false;
+        }, start, end);
         return textSB.toString();
     }
 
@@ -251,31 +278,23 @@ public final class PieceTable extends AbstractTextBuffer {
             throw new IllegalArgumentException("End index is not in range");
         }
         List<DecorationModel> mergedList = new ArrayList<>();
-        if (!pieces.isEmpty()) {
-            AtomicInteger accum = new AtomicInteger();
-            StringBuilder sb = new StringBuilder();
-            walkPieces((p, i, tp) -> {
-                Unit unit = p.getUnit();
-                sb.append(p.getInternalText());
-                if (start <= tp + p.length && end > tp && !unit.isEmpty()) {
-                    String text = sb.substring(Math.max(start, tp), Math.min(end, tp + p.length));
-                    int length = 0;
-                    if (!text.isEmpty()) {
-                        length = (unit instanceof TextUnit ? text : unit.getText()).length();
-                    }
-                    if (mergedList.isEmpty()) {
-                        dm = new DecorationModel(0, length, p.getDecoration(), p.getParagraphDecoration());
-                    } else if (p.getDecoration().equals(dm.getDecoration()) && p.getParagraphDecoration().equals(dm.getParagraphDecoration())) {
-                        mergedList.remove(mergedList.size() - 1);
-                        dm = new DecorationModel(dm.getStart(), dm.getLength() + length, dm.getDecoration(), dm.getParagraphDecoration());
-                    } else {
-                        dm = new DecorationModel(accum.addAndGet(dm.getLength()), length, p.getDecoration(), p.getParagraphDecoration());
-                    }
-                    mergedList.add(dm);
-                }
-                return (end <= tp);
-            });
-        }
+        walkRange((p, i, tp) -> {
+            Unit unit = p.getUnit();
+            if (unit.isEmpty()) return false;
+            int length = unit instanceof TextUnit ? Math.min(end - tp, p.length) - Math.max(start - tp, 0)
+                    : unit.getText().length();
+            if (length <= 0) return false;
+            DecorationModel previous = mergedList.isEmpty() ? null : mergedList.get(mergedList.size() - 1);
+            int offset = previous == null ? 0 : previous.getStart() + previous.getLength();
+            if (previous != null && p.getDecoration().equals(previous.getDecoration())
+                    && p.getParagraphDecoration().equals(previous.getParagraphDecoration())) {
+                mergedList.set(mergedList.size() - 1, new DecorationModel(previous.getStart(), previous.getLength() + length,
+                        p.getDecoration(), p.getParagraphDecoration()));
+            } else {
+                mergedList.add(new DecorationModel(offset, length, p.getDecoration(), p.getParagraphDecoration()));
+            }
+            return false;
+        }, start, end);
         if (mergedList.isEmpty()) {
             // An empty paragraph may still carry a table or other block style.
             // Export that structure instead of silently reverting it to prose.
@@ -345,46 +364,33 @@ public final class PieceTable extends AbstractTextBuffer {
      */
     @Override
     public void walkFragments(BiConsumer<Unit, Decoration> onFragment, int start, int end) {
-        StringBuilder sb = new StringBuilder();
-        walkPieces((p, i, tp) -> {
+        walkRange((p, i, tp) -> {
             Unit unit = p.getUnit();
-            sb.append(p.getInternalText());
-            if (start <= tp + p.length && end > tp && !unit.isEmpty()) {
-                String text = sb.substring(Math.max(start, tp), Math.min(end, tp + p.length));
-                if (!text.isEmpty()) {
-                    onFragment.accept(unit instanceof TextUnit ? new TextUnit(text) : unit, p.getDecoration());
-                }
+            if (!unit.isEmpty()) {
+                String text = p.getInternalText().substring(Math.max(start - tp, 0), Math.min(end - tp, p.length));
+                if (!text.isEmpty()) onFragment.accept(unit instanceof TextUnit ? new TextUnit(text) : unit, p.getDecoration());
             }
-            return (end <= tp);
-        });
+            return false;
+        }, start, end);
     }
 
     @Override
     public Decoration getDecorationAtCaret(int caretPosition) {
-        int textPosition = 0;
-        int index = 0;
-        for (; index < pieces.size(); index++) {
-            Piece piece = pieces.get(index);
-            if (textPosition < caretPosition && caretPosition <= textPosition + piece.length) {
-                return piece.getDecoration();
-            }
-            textPosition += piece.length;
+        if (caretPosition > 0 && caretPosition <= getTextLength()) {
+            int index = firstPieceEndingAfter(caretPosition - 1);
+            if (index < pieces.size()) return pieces.get(index).getDecoration();
         }
-        return previousPieceDecoration(index);
+        return previousPieceDecoration(pieces.size());
     }
 
     @Override
     public ParagraphDecoration getParagraphDecorationAtCaret(int caretPosition) {
-        int textPosition = 0;
-        int index = 0;
-        for (; index < pieces.size(); index++) {
-            Piece piece = pieces.get(index);
-            if (piece.length == 0 && textPosition == caretPosition && index == pieces.size() - 1)
-                return piece.getParagraphDecoration();
-            if (textPosition <= caretPosition && caretPosition < textPosition + piece.length) {
-                return piece.getParagraphDecoration();
-            }
-            textPosition += piece.length;
+        int index = firstPieceEndingAfter(caretPosition);
+        if (index < pieces.size()) return pieces.get(index).getParagraphDecoration();
+        if (!pieces.isEmpty()) {
+            Piece last = pieces.get(pieces.size() - 1);
+            if (last.length == 0 && pieceEnds[pieceEnds.length - 1] == caretPosition)
+                return last.getParagraphDecoration();
         }
         ParagraphDecoration prevDecoration = previousPieceParagraphDecoration(index);
         if (prevDecoration.hasTableDecoration()) {
@@ -529,10 +535,8 @@ class PieceCharacterIterator implements CharacterIterator {
 
         posArray = new int[pt.pieces.size() + 1];
         lineFeedList = new ArrayList<>();
-        StringBuilder sb = new StringBuilder();
         pt.walkPieces((p, i, tp) -> {
-            sb.append(p.getInternalText());
-            String text = sb.substring(tp);
+            String text = p.getInternalText();
             IntStream.iterate(text.indexOf(LF),
                             index -> index >= 0,
                             index -> text.indexOf(LF, index + 1))
@@ -548,11 +552,15 @@ class PieceCharacterIterator implements CharacterIterator {
         if (pos < 0 || pos >= pt.getTextLength()) {
             throw new IllegalArgumentException("Invalid pos value");
         }
-        for (int i = 0; i < posArray.length; i++) {
-            if (posArray[i] <= pos && pos < posArray[i + 1]) {
-                char c = pt.pieces.get(i).getInternalText().charAt(pos - posArray[i]);
-                return c == ZERO_WIDTH_TABLE_SEPARATOR ? ' ' : c;
-            }
+        int lo = 0, hi = posArray.length - 1;
+        while (lo < hi) {
+            int mid = (lo + hi) >>> 1;
+            if (posArray[mid + 1] <= pos) lo = mid + 1;
+            else hi = mid;
+        }
+        if (lo < pt.pieces.size() && posArray[lo] <= pos) {
+            char c = pt.pieces.get(lo).getInternalText().charAt(pos - posArray[lo]);
+            return c == ZERO_WIDTH_TABLE_SEPARATOR ? ' ' : c;
         }
         return 0;
     }
@@ -974,7 +982,7 @@ class TextDecorateCmd extends AbstractCommand<PieceTable> {
             pt.pieces.removeAll(newPieces);
 
             oldPieces.forEach(piece -> {
-                pt.fire(new TextBuffer.DecorateEvent(piece.start, piece.start + piece.length, piece.decoration));
+                pt.fire(new TextBuffer.DecorateEvent(start, end, piece.decoration));
             });
         }
     }
@@ -1081,7 +1089,7 @@ class ParagraphDecorateCmd extends AbstractCommand<PieceTable> {
             pt.pieces.removeAll(newPieces);
 
             oldPieces.forEach(piece -> {
-                pt.fire(new TextBuffer.DecorateEvent(piece.start, piece.start + piece.length, piece.decoration));
+                pt.fire(new TextBuffer.DecorateEvent(start, end, piece.decoration));
             });
         }
     }

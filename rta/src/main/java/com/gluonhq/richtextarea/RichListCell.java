@@ -77,6 +77,13 @@ class RichListCell extends ListCell<Paragraph> {
 
     private final RichTextAreaSkin richTextAreaSkin;
     private final ParagraphTile paragraphTile;
+    private Object renderedBuffer;
+    private long renderedRevision = -1;
+    private long renderedImageRevision = -1;
+    private Paragraph renderedParagraph;
+    private int renderedStart, renderedEnd;
+    private Object renderedDecoration;
+    private Object renderedSkinTone;
 
     RichListCell(RichTextAreaSkin richTextAreaSkin) {
         this.richTextAreaSkin = richTextAreaSkin;
@@ -163,6 +170,19 @@ class RichListCell extends ListCell<Paragraph> {
     protected void updateItem(Paragraph item, boolean empty) {
         super.updateItem(item, empty);
         if (item != null && !empty) {
+            var buffer = richTextAreaSkin.getViewModel().getTextBuffer();
+            Object tone = richTextAreaSkin.getSkinnable().getSkinTone();
+            if (buffer == renderedBuffer && buffer.getRevision() >= 0 && buffer.getRevision() == renderedRevision
+                    && renderedImageRevision == richTextAreaSkin.getImageRevision()
+                    && item == renderedParagraph && item.getStart() == renderedStart && item.getEnd() == renderedEnd
+                    && java.util.Objects.equals(item.getDecoration(), renderedDecoration)
+                    && java.util.Objects.equals(tone, renderedSkinTone) && getGraphic() == paragraphTile) {
+                paragraphTile.updateLayout();
+                return;
+            }
+            renderedImageRevision = richTextAreaSkin.getImageRevision();
+            renderedBuffer = buffer; renderedRevision = buffer.getRevision(); renderedParagraph = item;
+            renderedStart = item.getStart(); renderedEnd = item.getEnd(); renderedDecoration = item.getDecoration(); renderedSkinTone = tone;
             var fragments = new ArrayList<Node>();
             var backgroundIndexRanges = new ArrayList<IndexRangeColor>();
             var length = new AtomicInteger();
@@ -236,6 +256,7 @@ class RichListCell extends ListCell<Paragraph> {
             paragraphTile.updateLayout();
         } else {
             // clean up listeners
+            renderedParagraph = null; renderedBuffer = null;
             paragraphTile.setParagraph(null, null, null, null);
             setGraphic(null);
         }
@@ -321,15 +342,17 @@ class RichListCell extends ListCell<Paragraph> {
     }
 
     private ImageView buildImage(ImageDecoration imageDecoration) {
-        Image image = richTextAreaSkin.getImageCache().computeIfAbsent(imageDecoration.getUrl(), Image::new);
+        Image image = richTextAreaSkin.loadImage(imageDecoration.getUrl());
         final ImageView imageView = new ImageView(image);
+        if (image.getProgress() < 1 || image.isError()) imageView.setFitHeight(32);
         // TODO Create resizable ImageView
         if (imageDecoration.getWidth() > -1 && imageDecoration.getHeight() > -1) {
             imageView.setFitWidth(imageDecoration.getWidth());
             imageView.setFitHeight(imageDecoration.getHeight());
         } else {
             // for now, limit the image within the content area
-            double width = Math.min(image.getWidth(), richTextAreaSkin.textFlowPrefWidthProperty.get() - 10);
+            double available = Math.max(1, richTextAreaSkin.textFlowPrefWidthProperty.get() - 10);
+            double width = image.getProgress() < 1 ? Math.min(200, available) : Math.min(image.getWidth(), available);
             imageView.setFitWidth(width);
             imageView.setPreserveRatio(true);
         }

@@ -952,7 +952,7 @@ public class DocumentView extends Pane {
     }
 
     private javafx.scene.image.ImageView buildImage(com.gluonhq.richtextarea.model.ImageDecoration imageDecoration) {
-        javafx.scene.image.Image image = skin.getImageCache().computeIfAbsent(imageDecoration.getUrl(), javafx.scene.image.Image::new);
+        javafx.scene.image.Image image = skin.loadImage(imageDecoration.getUrl());
         javafx.scene.image.ImageView imageView = new javafx.scene.image.ImageView(image);
         double contentWidth = skin.textFlowPrefWidthProperty.get();
         if (imageDecoration.getWidth() > -1 && imageDecoration.getHeight() > -1) {

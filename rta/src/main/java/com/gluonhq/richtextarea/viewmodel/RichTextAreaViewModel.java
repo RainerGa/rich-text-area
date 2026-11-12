@@ -862,11 +862,14 @@ public class RichTextAreaViewModel {
     }
 
     void open(Document document) {
-        Platform.runLater(() -> {
-            // invalidate documentProperty
-            setDocument(null);
-            setDocument(document);
-        });
+        Platform.runLater(() -> openImmediately(document));
+    }
+
+    /** Installs an already parsed document on FX, with an observable completion boundary for async hosts. */
+    public void openImmediately(Document document) {
+        if (!Platform.isFxApplicationThread()) throw new IllegalStateException("Document installation requires FX");
+        setDocument(null);
+        setDocument(document);
     }
 
     void save() {

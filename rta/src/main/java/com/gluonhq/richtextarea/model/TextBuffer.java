@@ -82,6 +82,9 @@ public interface TextBuffer {
 
     interface Event {}
 
+    /** Monotonic content/style revision, advanced before change listeners run. */
+    default long getRevision() { return -1; }
+
     class InsertEvent implements Event {
 
         private final String text;

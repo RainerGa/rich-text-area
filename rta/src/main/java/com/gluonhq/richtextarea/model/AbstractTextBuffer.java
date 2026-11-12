@@ -38,6 +38,10 @@ import java.util.function.Consumer;
 public abstract class AbstractTextBuffer implements TextBuffer {
 
     private final Set<Consumer<Event>> listeners = new HashSet<>();
+    private long revision;
+
+    @Override
+    public final long getRevision() { return revision; }
 
     // textLengthProperty
     final ReadOnlyIntegerWrapper textLengthProperty = new ReadOnlyIntegerWrapper(this, "textLength");
@@ -57,6 +61,7 @@ public abstract class AbstractTextBuffer implements TextBuffer {
     }
 
     protected void fire( TextBuffer.Event event ) {
+        revision++;
         listeners.forEach(l -> l.accept(event));
     }
 

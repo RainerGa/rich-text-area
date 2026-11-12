@@ -357,13 +357,59 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
     };
 
     private final Map<Integer, Font> fontCache = new ConcurrentHashMap<>();
-    private final Map<String, Image> imageCache = new ConcurrentHashMap<>();
+    private final Map<Image, Runnable> pendingImages = new java.util.IdentityHashMap<>();
+    private final Map<String, Image> imageCache = new java.util.LinkedHashMap<>(32, 0.75f, true) {
+        @Override protected boolean removeEldestEntry(Map.Entry<String, Image> eldest) {
+            if (size() <= 256) return false;
+            Runnable detach = pendingImages.remove(eldest.getValue());
+            if (detach != null) { detach.run(); eldest.getValue().cancel(); }
+            return true;
+        }
+    };
+    private long imageRevision;
+    long getImageRevision() { return imageRevision; }
+
+    Image loadImage(String url) {
+        return imageCache.computeIfAbsent(url, source -> {
+            Image image = new Image(source, true);
+            if (image.getProgress() < 1 && !image.isError()) {
+                javafx.beans.InvalidationListener loaded = observable -> {
+                    if (image.getProgress() < 1 && !image.isError()) return;
+                    Runnable detach = pendingImages.remove(image);
+                    if (detach != null) detach.run();
+                    imageRevision++;
+                    paragraphHeights.clear();
+                    if (attachedProperty.get()) refreshTextFlow();
+                };
+                pendingImages.put(image, () -> {
+                    image.progressProperty().removeListener(loaded);
+                    image.errorProperty().removeListener(loaded);
+                });
+                image.progressProperty().addListener(loaded);
+                image.errorProperty().addListener(loaded);
+            }
+            return image;
+        });
+    }
     private final SmartTimer objectsCacheEvictionTimer;
     private boolean pageViewMode;
     private boolean typewriterMode;
     private boolean focusCurrentParagraph;
 
-    private final Consumer<TextBuffer.Event> textChangeListener = e -> refreshTextFlow();
+    private record HeightEntry(double width, int start, int end, ParagraphDecoration decoration, double height) { }
+    private final java.util.Map<Paragraph, HeightEntry> paragraphHeights = new java.util.IdentityHashMap<>();
+    private TextBuffer heightBuffer;
+    private final Consumer<TextBuffer.Event> textChangeListener = event -> {
+        int start;
+        int end;
+        if (event instanceof TextBuffer.DecorateEvent changed) { start = changed.getStart(); end = changed.getEnd(); }
+        else if (event instanceof TextBuffer.InsertEvent changed) { start = changed.getPosition(); end = Integer.MAX_VALUE; }
+        else if (event instanceof TextBuffer.DeleteEvent changed) { start = changed.getPosition(); end = Integer.MAX_VALUE; }
+        else { start = 0; end = Integer.MAX_VALUE; }
+        final int first = start, last = end;
+        paragraphHeights.entrySet().removeIf(entry -> entry.getValue().end() >= first && entry.getValue().start() <= last);
+        refreshTextFlow();
+    };
     int lastValidCaretPosition = -1;
     int mouseDragStart = -1;
     int dragAndDropStart = -1;
@@ -375,7 +421,8 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
         @Override
         protected void invalidated() {
             if (paragraphListView != null) {
-                Platform.runLater(paragraphListView::updateLayout);
+                get(); // rearm binding invalidation while the update is queued
+                requestWidthLayout();
             }
         }
     };
@@ -776,13 +823,10 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
             return cell;
         });
         objectsCacheEvictionTimer = new SmartTimer(paragraphListView::evictUnusedObjects, 1000, 60000);
-        controlPrefWidthListener = (obs, ov, nv) -> {
-            refreshTextFlow();
-            paragraphListView.updateLayout();
-        };
+        controlPrefWidthListener = (obs, ov, nv) -> requestWidthLayout();
 
         tableAllowedListener = (obs, ov, nv) -> viewModel.setTableAllowed(nv);
-        skinToneChangeListener = (obs, ov, nv) -> refreshTextFlow();
+        skinToneChangeListener = (obs, ov, nv) -> { paragraphHeights.clear(); refreshTextFlow(); };
 
         focusListener = o -> {
             paragraphListView.updateLayout();
@@ -822,6 +866,15 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
 
     @Override
     public void dispose() {
+        imageValidations.forEach(task -> task.cancel(true));
+        imageValidations.clear();
+        IMAGE_VALIDATION.purge();
+        pendingImages.values().forEach(Runnable::run);
+        pendingImages.keySet().forEach(Image::cancel);
+        pendingImages.clear();
+        imageCache.clear();
+        paragraphHeights.clear();
+        heightBuffer = null;
         viewModel.clearSelection();
         viewModel.removeChangeListener(textChangeListener);
         viewModel.documentProperty().removeListener(documentChangeListener);
@@ -982,8 +1035,19 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
         promptNode.relocate(x, origin.getY());
     }
 
-    // TODO Need more optimal way of rendering text fragments.
-    //  For now rebuilding the whole text flow
+    private boolean widthLayoutPending;
+    private void requestWidthLayout() {
+        if (widthLayoutPending) return;
+        widthLayoutPending = true;
+        Platform.runLater(() -> {
+            widthLayoutPending = false;
+            if (!attachedProperty.get()) return;
+            paragraphListView.updateLayout();
+            if (!pageViewMode) computeFullHeight();
+        });
+    }
+
+    // Reuse paragraph measurements and unchanged cell fragments across layout refreshes.
     private void refreshTextFlow() {
         objectsCacheEvictionTimer.pause();
         try {
@@ -1171,6 +1235,13 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
     }
 
     private void computeFullHeight() {
+        if (heightBuffer != viewModel.getTextBuffer()) {
+            paragraphHeights.clear();
+            heightBuffer = viewModel.getTextBuffer();
+        }
+        var retained = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Paragraph, Boolean>());
+        retained.addAll(paragraphSortedList);
+        paragraphHeights.keySet().retainAll(retained);
         double totalHeight = 0;
         // Measure every paragraph directly instead of relying on visible VirtualFlow cells.
         // The VirtualFlow only materializes cells for the visible viewport, so summing
@@ -1194,8 +1265,14 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
         if (paragraph == null) {
             return 0;
         }
+        if (heightBuffer != viewModel.getTextBuffer()) {
+            paragraphHeights.clear(); heightBuffer = viewModel.getTextBuffer();
+        }
         ParagraphDecoration decoration = paragraph.getDecoration();
         double width = contentWidth > 0 ? contentWidth : defaultContentWidth();
+        HeightEntry cached = paragraphHeights.get(paragraph);
+        if (cached != null && cached.width() == width && cached.start() == paragraph.getStart()
+                && cached.end() == paragraph.getEnd() && Objects.equals(cached.decoration(), decoration)) return cached.height();
 
         TextFlow textFlow = new TextFlow();
         textFlow.setPrefWidth(width);
@@ -1225,7 +1302,9 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
             }
         }, paragraph.getStart(), paragraph.getEnd());
 
-        return textFlow.prefHeight(textFlow.getPrefWidth()) + 1;
+        double height = textFlow.prefHeight(textFlow.getPrefWidth()) + 1;
+        paragraphHeights.put(paragraph, new HeightEntry(width, paragraph.getStart(), paragraph.getEnd(), decoration, height));
+        return height;
     }
 
     private double defaultContentWidth() {
@@ -1274,8 +1353,9 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
     }
 
     private ImageView createImageView(ImageDecoration imageDecoration) {
-        Image image = imageCache.computeIfAbsent(imageDecoration.getUrl(), Image::new);
+        Image image = loadImage(imageDecoration.getUrl());
         ImageView imageView = new ImageView(image);
+        if (image.getProgress() < 1 || image.isError()) imageView.setFitHeight(32);
         double contentWidth = textFlowPrefWidthProperty.get();
         if (contentWidth <= 0) {
             contentWidth = 400;
@@ -1284,7 +1364,8 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
             imageView.setFitWidth(imageDecoration.getWidth());
             imageView.setFitHeight(imageDecoration.getHeight());
         } else {
-            double width = Math.min(image.getWidth(), contentWidth - 10);
+            double width = image.getProgress() < 1 ? Math.min(200, Math.max(1, contentWidth - 10))
+                    : Math.min(image.getWidth(), Math.max(1, contentWidth - 10));
             imageView.setFitWidth(width);
             imageView.setPreserveRatio(true);
         }
@@ -1389,32 +1470,58 @@ public class RichTextAreaSkin extends SkinBase<RichTextArea> {
         } else if (dragEvent.getEventType() == DragEvent.DRAG_DROPPED) {
             Dragboard dragboard = dragEvent.getDragboard();
             if (!dragboard.getFiles().isEmpty()) {
-                dragboard.getFiles().forEach(file -> {
-                    String url = file.toURI().toString();
-                    // validate image before adding it
-                    if (url != null && new Image(url).getException() == null) {
-                        ACTION_CMD_FACTORY.decorate(new ImageDecoration(url)).apply(viewModel);
-                    }
-                });
+                validateDroppedImages(dragboard.getFiles().stream().map(file -> file.toURI().toString()).toList(), false);
             } else if (dragboard.hasUrl()) {
-                String url = dragboard.getUrl();
-                // validate if url is an image before adding it:
-                if (url != null) {
-                    if (new Image(url).getException() == null) {
-                        ACTION_CMD_FACTORY.decorate(new ImageDecoration(url)).apply(viewModel);
-                    } else {
-                        // add text and hyperlink
-                        int caret = viewModel.getCaretPosition();
-                        ACTION_CMD_FACTORY.insertText(url).apply(viewModel);
-                        viewModel.setSelection(new Selection(caret, caret + url.length()));
-                        ACTION_CMD_FACTORY.decorate(TextDecoration.builder().url(url).build()).apply(viewModel);
-                    }
-                }
+                if (dragboard.getUrl() != null) validateDroppedImages(List.of(dragboard.getUrl()), true);
             } else if (dragboard.hasString()) {
                 ACTION_CMD_FACTORY.insertText(dragboard.getString()).apply(viewModel);
             }
             requestLayout();
             dragAndDropStart = -1;
+        }
+    }
+
+    private static final java.util.concurrent.ThreadPoolExecutor IMAGE_VALIDATION = new java.util.concurrent.ThreadPoolExecutor(
+            1, 2, 30, java.util.concurrent.TimeUnit.SECONDS, new java.util.concurrent.ArrayBlockingQueue<>(16), task -> {
+                Thread thread = new Thread(task, "rich-text-image-validation"); thread.setDaemon(true); return thread;
+            });
+    private final java.util.Set<java.util.concurrent.Future<?>> imageValidations = new java.util.HashSet<>();
+
+    private void validateDroppedImages(List<String> urls, boolean hyperlinkFallback) {
+        imageValidations.removeIf(java.util.concurrent.Future::isDone);
+        TextBuffer buffer = viewModel.getTextBuffer();
+        long revision = buffer.getRevision();
+        int caret = viewModel.getCaretPosition();
+        Selection selection = viewModel.getSelection();
+        try {
+            IMAGE_VALIDATION.purge();
+            imageValidations.add(IMAGE_VALIDATION.submit(() -> {
+                List<Image> images = new ArrayList<>();
+                for (String url : urls) {
+                    if (Thread.currentThread().isInterrupted()) return;
+                    try { images.add(new Image(url)); }
+                    catch (IllegalArgumentException invalid) { images.add(null); }
+                }
+                Platform.runLater(() -> {
+                    if (!attachedProperty.get() || viewModel.getTextBuffer() != buffer || buffer.getRevision() != revision
+                            || viewModel.getCaretPosition() != caret || !Objects.equals(viewModel.getSelection(), selection)) return;
+                    for (int i = 0; i < urls.size(); i++) {
+                        String url = urls.get(i); Image image = images.get(i);
+                        if (image != null && !image.isError()) {
+                            imageCache.put(url, image);
+                            ACTION_CMD_FACTORY.decorate(new ImageDecoration(url)).apply(viewModel);
+                        } else if (hyperlinkFallback) {
+                            int start = viewModel.getCaretPosition();
+                            ACTION_CMD_FACTORY.insertText(url).apply(viewModel);
+                            viewModel.setSelection(new Selection(start, start + url.length()));
+                            ACTION_CMD_FACTORY.decorate(TextDecoration.builder().url(url).build()).apply(viewModel);
+                        }
+                    }
+                    requestLayout();
+                });
+            }));
+        } catch (java.util.concurrent.RejectedExecutionException busy) {
+            LOG.log(Level.WARNING, "Image validation busy; drop was not inserted", busy);
         }
     }
 
