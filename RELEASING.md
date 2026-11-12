@@ -4,11 +4,11 @@ This repository publishes GitHub releases for the RainerGa fork. It does not
 deploy fork versions to Gluon's Maven Central namespace.
 
 Use JDK 25. JavaFX is pinned to 25.0.4. The Noto dependency and integration tests
-come from Mardexas commit `007aaf358f2da13fdb710b8936da8bc67ce475ab`:
+come from Mardexas commit `1929deca0ae03c9899725051b1137b16bfcc675e`:
 
 ```sh
 git clone https://github.com/RainerGa/Mardexas.git integration
-git -C integration checkout 007aaf358f2da13fdb710b8936da8bc67ce475ab
+git -C integration checkout 1929deca0ae03c9899725051b1137b16bfcc675e
 mvn -B -ntp -f integration/emoji-noto/pom.xml install
 mvn -B -ntp -f rta/pom.xml -Pfork-tests -Dmaven.source.skip=false -Dmaven.javadoc.skip=false install
 mvn -B -ntp -f samples/pom.xml verify
@@ -30,9 +30,14 @@ table and page-layout contracts on Linux, Windows and both macOS architectures.
 
 Update all three POMs and the samples' parent version together. Add release notes
 under `releases/<version>.md`. Push `main`, inspect its Build run, then push an
-annotated tag matching the version exactly. The tag's Release workflow reruns
-all four platforms and publishes only after every build passes. A dispatch on
-a branch validates without publishing. No Sonatype or GPG secrets are required.
+annotated tag matching the version exactly. The tag's Release workflow requires
+a successful four-platform `main` push build for that exact commit, downloads
+its retained assets and verifies every SHA-256 checksum before publishing.
+It never uses a different commit's artifacts or a pull-request build. If the
+main build failed or its artifacts expired, publication fails. Rerun that
+commit's main push build before retrying the release. A dispatch on a tag retries
+publication; a branch dispatch does not publish. No Sonatype or GPG secrets are
+required.
 
 Release assets include library, sources and Javadoc JARs, both Maven POMs, the
 required `emoji-noto` JAR, a dependency/source bundle and SHA-256 checksums.

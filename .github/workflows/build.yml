@@ -26,7 +26,7 @@ jobs:
         uses: actions/checkout@v7.0.1
         with:
           repository: RainerGa/Mardexas
-          ref: 007aaf358f2da13fdb710b8936da8bc67ce475ab
+          ref: 1929deca0ae03c9899725051b1137b16bfcc675e
           path: integration
       - uses: actions/setup-java@v6.2.0
         with:
@@ -57,6 +57,7 @@ jobs:
         uses: actions/upload-artifact@v7.0.2
         with:
           name: rich-text-area-release
+          overwrite: true
           path: target/release/*
           if-no-files-found: error
       - name: Retain test evidence
@@ -64,6 +65,7 @@ jobs:
         uses: actions/upload-artifact@v7.0.2
         with:
           name: test-reports-${{ matrix.os }}
+          overwrite: true
           path: |
             rta/target/surefire-reports/
             integration/editor/target/surefire-reports/

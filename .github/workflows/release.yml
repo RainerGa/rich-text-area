@@ -6,22 +6,33 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
-  verify:
-    uses: ./.github/workflows/build.yml
   release:
-    needs: verify
     if: github.ref_type == 'tag'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@v7.0.1
-      - uses: actions/download-artifact@v8.0.2
-        with:
-          name: rich-text-area-release
-          path: target/release
+      - name: Download assets from the successful main build of this exact commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow build.yml \
+            --branch main --commit "$GITHUB_SHA" --event push --status success \
+            --limit 100 --json databaseId --jq '.[0].databaseId // empty')
+          if [ -z "$run_id" ]; then
+            echo '::error::No successful four-platform main build exists for this exact tag commit.'
+            exit 1
+          fi
+          gh run download "$run_id" --repo "$GITHUB_REPOSITORY" \
+            --name rich-text-area-release --dir target/release
+          (cd target/release && sha256sum -c SHA256SUMS)
+          echo "Verified build: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run_id" >> "$GITHUB_STEP_SUMMARY"
       - name: Publish verified fork release
         env:
           GH_TOKEN: ${{ github.token }}
