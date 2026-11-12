@@ -6,7 +6,7 @@
     
     <groupId>com.gluonhq</groupId>
     <artifactId>rich-text-area-parent</artifactId>
-    <version>3.0-RG</version>
+    <version>3.5-RG</version>
     <packaging>pom</packaging>
     
     <name>Rich Text Area Parent</name>

@@ -86,7 +86,7 @@ import java.util.function.Consumer;
  *   <li>Each page renders its paragraphs with live {@link ParagraphTile}s bound to the
  *       shared view model, so the caret, selection, hit testing and editing all work
  *       directly on the displayed pages.</li>
- * </ol>
+ * </ul>
  */
 public class DocumentView extends Pane {
 

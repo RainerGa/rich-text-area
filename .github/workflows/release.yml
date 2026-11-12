@@ -1,58 +1,45 @@
 name: Release
 on:
+  push:
+    tags: ['*-RG']
   workflow_dispatch:
-    inputs:
-      nextVersion:
-        description: 'Next development version without "SNAPSHOT". If not provided, the next version will be calculated from the pom'
-        required: false
-        type: string
+
+permissions:
+  contents: read
+  actions: read
 
 jobs:
-  pre-release:
-    uses: gluonhq/actions/.github/workflows/maven-pre-release.yml@v1
-    with:
-      buildDir: rta
-      depProperty: rta.version
-      depDirectory: samples
-
   release:
-    needs: pre-release
-    runs-on: ubuntu-latest
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.pre-release.outputs.tag }}
-
-      - name: Setup Java and Apache Maven
-        uses: actions/setup-java@v4
-        with:
-          java-version: 25
-          distribution: 'oracle'
-          cache: 'maven'
-          server-id: central
-          server-username: MAVEN_USERNAME
-          server-password: MAVEN_CENTRAL_TOKEN
-          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
-          gpg-passphrase: MAVEN_GPG_PASSPHRASE
-
-      - name: Publish to Maven Central
-        id: deploy
-        run: |
-          ./mvnw -B -ntp -Ptest verify -f rta
-          ./mvnw -B -Dmaven.test.skip=true -Prelease deploy -f rta
-          echo ::set-output name=exit_code::$?
+      - uses: actions/checkout@v7.0.1
+      - name: Download assets from the successful main build of this exact commit
         env:
-          MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
-          MAVEN_CENTRAL_TOKEN: ${{ secrets.SONATYPE_PASSWORD }}
-          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-
-  post-release:
-    needs: [ pre-release, release ]
-    uses: gluonhq/actions/.github/workflows/maven-post-release.yml@v1
-    with:
-      tag: ${{ needs.pre-release.outputs.tag }}
-      nextVersion: ${{ github.event.inputs.nextVersion }}
-      buildDir: rta
-      depProperty: rta.version
-      depDirectory: samples
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow build.yml \
+            --branch main --commit "$GITHUB_SHA" --event push --status success \
+            --limit 100 --json databaseId --jq '.[0].databaseId // empty')
+          if [ -z "$run_id" ]; then
+            echo '::error::No successful four-platform main build exists for this exact tag commit.'
+            exit 1
+          fi
+          gh run download "$run_id" --repo "$GITHUB_REPOSITORY" \
+            --name rich-text-area-release --dir target/release
+          (cd target/release && sha256sum -c SHA256SUMS)
+          echo "Verified build: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run_id" >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish verified fork release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          version=$(python3 -c 'import xml.etree.ElementTree as E; print(E.parse("rta/pom.xml").findtext("{*}version"))')
+          test "$RELEASE_TAG" = "$version"
+          gh release create "$RELEASE_TAG" target/release/* --verify-tag --latest \
+            --title "Rich Text Area $RELEASE_TAG" --notes-file "releases/$RELEASE_TAG.md"

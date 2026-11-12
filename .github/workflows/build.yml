@@ -4,45 +4,70 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
+    defaults:
+      run:
+        shell: bash
     strategy:
+      fail-fast: false
       matrix:
-        os: [ macos-latest, ubuntu-latest, windows-latest ]
+        os: [ubuntu-24.04, windows-2025, macos-15, macos-15-intel]
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v7.0.1
+      - name: Check out pinned emoji sources and editor regression suite
+        uses: actions/checkout@v7.0.1
         with:
-          java-version: 25
-          distribution: 'oracle'
-          cache: 'maven'
-          server-id: central
-          server-username: MAVEN_USERNAME
-          server-password: MAVEN_CENTRAL_TOKEN
-
-      - name: Build project (Linux/macOS)
-        if: runner.os != 'Windows'
-        run: |
-          ./mvnw -B -ntp -Ptest verify -f rta
-
-      - name: Build project (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          .\mvnw -B -ntp -Ptest verify -f rta
-
-      - name: Publish Snapshots
-        if: github.ref == 'refs/heads/main' && runner.os == 'Linux'
-        run: |
-          ver=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout -f rta)
-          if [[ $ver == *"SNAPSHOT"* ]]; then
-              ./mvnw -B -ntp -Dmaven.test.skip=true deploy -f rta
-          fi
+          repository: RainerGa/Mardexas
+          ref: 1929deca0ae03c9899725051b1137b16bfcc675e
+          path: integration
+      - uses: actions/setup-java@v6.2.0
+        with:
+          java-version: '25'
+          distribution: temurin
+          cache: maven
+      - uses: actions/setup-python@v7.1.0
+        with:
+          python-version: '3.12'
+      - name: Build pinned offline Noto dependency
+        run: mvn -B -ntp -f integration/emoji-noto/pom.xml install
+      - name: Verify library and build release jars
+        run: mvn -B -ntp -f rta/pom.xml -Pfork-tests -Dmaven.source.skip=false -Dmaven.javadoc.skip=false install
+      - name: Compile all fork samples
+        run: mvn -B -ntp -f samples/pom.xml verify
+      - name: Verify editor GUI contracts against this library
         shell: bash
-        env:
-          MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
-          MAVEN_CENTRAL_TOKEN: ${{ secrets.SONATYPE_PASSWORD }}
+        run: |
+          version=$(python3 -c 'import xml.etree.ElementTree as E; print(E.parse("rta/pom.xml").findtext("{*}version"))')
+          mvn -B -ntp -f integration/pom.xml "-Drichtextarea.version=$version" verify
+      - name: Test release packaging
+        run: python3 -B -m unittest discover -s scripts -p 'test_*.py'
+      - name: Assemble release bundle
+        if: runner.os == 'Linux'
+        run: python3 scripts/release_bundle.py --emoji integration/emoji-noto
+      - name: Retain release assets
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: rich-text-area-release
+          overwrite: true
+          path: target/release/*
+          if-no-files-found: error
+      - name: Retain test evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: test-reports-${{ matrix.os }}
+          overwrite: true
+          path: |
+            rta/target/surefire-reports/
+            integration/editor/target/surefire-reports/
+            integration/integration-demos/target/surefire-reports/
+          if-no-files-found: warn
