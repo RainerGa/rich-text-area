@@ -4,11 +4,11 @@ This repository publishes GitHub releases for the RainerGa fork. It does not
 deploy fork versions to Gluon's Maven Central namespace.
 
 Use JDK 25. JavaFX is pinned to 25.0.4. The Noto dependency and integration tests
-come from Mardexas commit `1929deca0ae03c9899725051b1137b16bfcc675e`:
+come from Mardexas commit `cc3ed08826ba43f7bdb912ddeaddd1fa2885535b`:
 
 ```sh
 git clone https://github.com/RainerGa/Mardexas.git integration
-git -C integration checkout 1929deca0ae03c9899725051b1137b16bfcc675e
+git -C integration checkout cc3ed08826ba43f7bdb912ddeaddd1fa2885535b
 mvn -B -ntp -f integration/emoji-noto/pom.xml install
 mvn -B -ntp -f rta/pom.xml -Pfork-tests -Dmaven.source.skip=false -Dmaven.javadoc.skip=false install
 mvn -B -ntp -f samples/pom.xml verify
@@ -26,12 +26,12 @@ test-skip settings for embedding in Mardexas. Legacy GUI tests and the old
 Field/Style/StyleRegistry/PageFormat test classes target APIs this implementation
 does not expose and still require porting; they are not claimed as passing.
 The pinned editor suite supplies current GUI, caret, selection, undo/redo,
-table and page-layout contracts on Linux, Windows and both macOS architectures.
+table and page-layout contracts on Linux and Windows.
 
 Update all three POMs and the samples' parent version together. Add release notes
 under `releases/<version>.md`. Push `main`, inspect its Build run, then push an
 annotated tag matching the version exactly. The tag's Release workflow requires
-a successful three-platform `main` push build (Linux, Windows, macOS Intel)
+a successful two-platform `main` push build (Linux and Windows)
 for that exact commit, downloads
 its retained assets and verifies every SHA-256 checksum before publishing.
 It never uses a different commit's artifacts or a pull-request build. If the

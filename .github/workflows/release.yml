@@ -26,7 +26,7 @@ jobs:
             --branch main --commit "$GITHUB_SHA" --event push --status success \
             --limit 100 --json databaseId --jq '.[0].databaseId // empty')
           if [ -z "$run_id" ]; then
-            echo '::error::No successful three-platform main build exists for this exact tag commit.'
+            echo '::error::No successful Linux/Windows main build exists for this exact tag commit.'
             exit 1
           fi
           gh run download "$run_id" --repo "$GITHUB_REPOSITORY" \
