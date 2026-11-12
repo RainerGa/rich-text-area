@@ -31,7 +31,8 @@ table and page-layout contracts on Linux, Windows and both macOS architectures.
 Update all three POMs and the samples' parent version together. Add release notes
 under `releases/<version>.md`. Push `main`, inspect its Build run, then push an
 annotated tag matching the version exactly. The tag's Release workflow requires
-a successful four-platform `main` push build for that exact commit, downloads
+a successful three-platform `main` push build (Linux, Windows, macOS Intel)
+for that exact commit, downloads
 its retained assets and verifies every SHA-256 checksum before publishing.
 It never uses a different commit's artifacts or a pull-request build. If the
 main build failed or its artifacts expired, publication fails. Rerun that
