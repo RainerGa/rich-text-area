@@ -12,6 +12,9 @@ permissions:
 
 jobs:
   build:
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
@@ -23,7 +26,7 @@ jobs:
         uses: actions/checkout@v7.0.1
         with:
           repository: RainerGa/Mardexas
-          ref: 6df383f562e08def9d22e105cacf90073ca4c755
+          ref: 007aaf358f2da13fdb710b8936da8bc67ce475ab
           path: integration
       - uses: actions/setup-java@v6.2.0
         with:

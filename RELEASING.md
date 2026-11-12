@@ -4,11 +4,11 @@ This repository publishes GitHub releases for the RainerGa fork. It does not
 deploy fork versions to Gluon's Maven Central namespace.
 
 Use JDK 25. JavaFX is pinned to 25.0.4. The Noto dependency and integration tests
-come from Mardexas commit `6df383f562e08def9d22e105cacf90073ca4c755`:
+come from Mardexas commit `007aaf358f2da13fdb710b8936da8bc67ce475ab`:
 
 ```sh
 git clone https://github.com/RainerGa/Mardexas.git integration
-git -C integration checkout 6df383f562e08def9d22e105cacf90073ca4c755
+git -C integration checkout 007aaf358f2da13fdb710b8936da8bc67ce475ab
 mvn -B -ntp -f integration/emoji-noto/pom.xml install
 mvn -B -ntp -f rta/pom.xml -Pfork-tests -Dmaven.source.skip=false -Dmaven.javadoc.skip=false install
 mvn -B -ntp -f samples/pom.xml verify
