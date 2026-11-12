@@ -192,12 +192,9 @@
                 <configuration>
                     <trimStackTrace>false</trimStackTrace>
                     <argLine>${test.headless} --add-opens javafx.graphics/com.sun.javafx.application=ALL-UNNAMED</argLine>
-                    <systemProperties>
-                        <property>
-                            <name>java.util.logging.config.file</name>
-                            <value>src/test/resources/logging.properties</value>
-                        </property>
-                    </systemProperties>
+                    <systemPropertyVariables>
+                        <java.util.logging.config.file>src/test/resources/logging.properties</java.util.logging.config.file>
+                    </systemPropertyVariables>
                 </configuration>
             </plugin>
         </plugins>
